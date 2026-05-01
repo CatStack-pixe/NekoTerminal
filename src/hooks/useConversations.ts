@@ -36,9 +36,9 @@ export function useConversations() {
         .from('conversations')
         .insert({
           user_id: user.id,
-          title: payload.title ?? 'New Channel',
-          model: payload.model ?? 'gpt-4o-mini',
-          api_url: payload.api_url ?? 'https://api.openai.com/v1',
+          title: payload.title ?? 'NEW TRANSMISSION',
+          model: payload.model ?? 'gemini-2.5-flash',
+          api_url: payload.api_url ?? 'https://vipapi.online/v1/chat/completions',
           api_key: payload.api_key ?? '',
           system_prompt: payload.system_prompt ?? '',
         })

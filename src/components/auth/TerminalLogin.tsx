@@ -132,7 +132,7 @@ const BOOT_SEQUENCE: LogLine[] = [
   { text: '', type: 'info' },
 ]
 
-type Phase = 'boot' | 'ready' | 'login-email' | 'login-otp'
+type Phase = 'boot' | 'ready' | 'login-email'
 
 export function TerminalLogin() {
   const { signInWithEmail, verifyOtp } = useAuth()
@@ -141,7 +141,6 @@ export function TerminalLogin() {
   const [bootIndex, setBootIndex] = useState(0)
   const [input, setInput] = useState('')
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [infoMsg, setInfoMsg] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -201,7 +200,7 @@ export function TerminalLogin() {
 
   // ====== Tab 补全 ======
   const handleTab = () => {
-    if (phase === 'login-email' || phase === 'login-otp') return
+    if (phase === 'login-email') return
 
     const cur = inputRef_val.current
     if (!cur.trim()) return
@@ -328,7 +327,7 @@ export function TerminalLogin() {
       addLog('  ↑/↓ arrows                    Command history', 'info')
     } else if (lower === 'login') {
       setPhase('login-email')
-      addLog('Enter your email address to receive a login code:', 'system')
+      addLog('Enter your email address to receive a Magic Link:', 'system')
     } else if (lower === 'window') {
       openWindow('login')
     } else if (lower.startsWith('window ')) {
@@ -422,14 +421,14 @@ export function TerminalLogin() {
     }
   }
 
-  // ====== 邮箱登录 ======
+  // ====== Magic Link 登录 ======
   const handleEmailSubmit = async () => {
     if (!email.trim()) return
     setError('')
     setInfoMsg('')
     addLog(`$ ${email}`, 'system')
 
-    setInfoMsg('Sending verification code...')
+    setInfoMsg('Sending Magic Link...')
     const result = await signInWithEmail(email.trim())
     if (result.error) {
       setError(result.error)
@@ -438,38 +437,16 @@ export function TerminalLogin() {
       return
     }
     setInfoMsg('')
-    addLog('Verification code sent! Check your email.', 'success')
-    addLog('Enter the 6-digit code:', 'system')
-    setPhase('login-otp')
-  }
-
-  const handleOtpSubmit = async () => {
-    if (!otp.trim()) return
-    setError('')
-    setInfoMsg('')
-    addLog(`$ ${otp}`, 'system')
-
-    setInfoMsg('Verifying...')
-    const result = await verifyOtp(email.trim(), otp.trim())
-    if (result.error) {
-      setError(result.error)
-      addLog(`Error: ${result.error}`, 'error')
-      addLog('Try again or type "login" to restart.', 'system')
-      setOtp('')
-      setInfoMsg('')
-      return
-    }
-    setInfoMsg('')
-    addLog('Authentication successful! Welcome to CatStack.', 'success')
+    addLog('[  OK  ] Magic Link sent!', 'success')
+    addLog('Check your email and click the link to sign in.', 'system')
+    addLog('This terminal will auto-refresh upon successful login.', 'info')
     setPhase('ready')
     setEmail('')
-    setOtp('')
-    setTimeout(() => window.location.reload(), 1500)
   }
 
   const handleWindowLogin = async (val: string) => {
     setEmail(val)
-    setInfoMsg('Sending verification code...')
+    setInfoMsg('Sending Magic Link...')
     const result = await signInWithEmail(val.trim())
     if (result.error) {
       setError(result.error)
@@ -478,9 +455,10 @@ export function TerminalLogin() {
       return
     }
     setInfoMsg('')
-    addLog(`Verification code sent to ${val}`, 'success')
-    addLog('Enter the code below:', 'system')
-    setPhase('login-otp')
+    addLog(`[  OK  ] Magic Link sent to ${val}`, 'success')
+    addLog('Check your email and click the link to sign in.', 'system')
+    setEmail('')
+    setPhase('ready')
   }
 
   // ====== 键盘事件 ======
@@ -488,8 +466,6 @@ export function TerminalLogin() {
     if (e.key === 'Enter') {
       if (phase === 'login-email') {
         handleEmailSubmit()
-      } else if (phase === 'login-otp') {
-        handleOtpSubmit()
       } else {
         handleCommand(input)
       }
@@ -560,8 +536,8 @@ export function TerminalLogin() {
       {showInput && (
         <div className="border-t border-[#3c3c3c] p-2 bg-[#1e1e1e] shrink-0 relative z-[60]">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-[#569cd6] shrink-0">
-              {phase === 'login-email' ? 'email>' : phase === 'login-otp' ? 'code>' : '$'}
+          <span className="font-mono text-sm text-[#569cd6] shrink-0">
+              {phase === 'login-email' ? 'email>' : '$'}
             </span>
             {phase === 'login-email' ? (
               <input
@@ -571,17 +547,6 @@ export function TerminalLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="user@example.com"
-                className="flex-1 bg-transparent border-none outline-none text-sm text-[#cccccc] font-mono placeholder:text-[#808080]/50"
-              />
-            ) : phase === 'login-otp' ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="000000"
-                maxLength={6}
                 className="flex-1 bg-transparent border-none outline-none text-sm text-[#cccccc] font-mono placeholder:text-[#808080]/50"
               />
             ) : (

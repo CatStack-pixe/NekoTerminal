@@ -49,12 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+
   const signInWithEmail = async (email: string) => {
     if (!supabase) return { error: 'Supabase 未配置' }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${siteUrl}/auth/callback`,
       },
     })
 
@@ -65,19 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {}
   }
 
-  const verifyOtp = async (email: string, token: string) => {
-    if (!supabase) return { error: 'Supabase 未配置' }
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    })
-
-    if (error) {
-      return { error: error.message }
-    }
-
-    return {}
+  // OTP 验证已废弃 —— 改用 Magic Link 回调流程
+  const verifyOtp = async (_email: string, _token: string) => {
+    return { error: 'OTP 已弃用，请使用 Magic Link 登录' }
   }
 
   const signOut = async () => {
