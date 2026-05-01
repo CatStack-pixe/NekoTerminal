@@ -66,24 +66,34 @@ export default function HomePage() {
   const handleSend = useCallback(
     async (content: string) => {
       let convId = activeConversationId
+      let apiUrl: string
+      let apiKey: string
+      let model: string
 
-      if (!convId) {
+      if (convId) {
+        const currentConv = conversations?.find((c: Conversation) => c.id === convId)
+        if (!currentConv) return
+        apiUrl = currentConv.api_url
+        apiKey = currentConv.api_key ?? ''
+        model = currentConv.model
+      } else {
+        // 新建对话，使用 mutateAsync 返回的完整对象
         const title = content.substring(0, 40) + (content.length > 40 ? '…' : '')
         const conv = await createConversation.mutateAsync({ title })
         convId = conv.id
         setActiveConversationId(conv.id)
+        apiUrl = conv.api_url
+        apiKey = conv.api_key ?? ''
+        model = conv.model
       }
-
-      const currentConv = conversations?.find((c: Conversation) => c.id === convId)
-      if (!currentConv) return
 
       try {
         await sendMessageAsync({
           conversationId: convId,
           messages: [{ role: 'user' as const, content, image_url: null }],
-          apiUrl: currentConv.api_url,
-          apiKey: currentConv.api_key ?? '',
-          model: currentConv.model,
+          apiUrl,
+          apiKey,
+          model,
         })
       } catch {
         // 错误已在 hook 中处理

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react'
+import { cn } from '@/lib/utils'
 
 interface ChatInputProps {
   onSend: (content: string) => void
@@ -58,9 +59,12 @@ export function ChatInput({
           placeholder={
             isStreaming ? 'Awaiting response...' : 'Type your transmission...'
           }
-          disabled={disabled || isStreaming}
+          disabled={disabled}
           rows={1}
-          className="flex-1 resize-none bg-transparent border-none outline-none font-mono text-sm text-terminal-text placeholder:text-terminal-dim/40 px-1.5 py-1 disabled:opacity-50"
+          className={cn(
+            'flex-1 resize-none bg-transparent border-none outline-none font-mono text-sm text-terminal-text placeholder:text-terminal-dim/40 px-1.5 py-1',
+            (disabled || isStreaming) ? 'opacity-50' : ''
+          )}
         />
 
         {/* 图片上传按钮 */}
@@ -82,10 +86,11 @@ export function ChatInput({
           className="hidden"
         />
 
-        {/* 发送按钮 */}
-        <button
-          onClick={handleSend}
-          disabled={disabled || isStreaming || !input.trim()}
+          {/* 发送按钮 */}
+          <button
+            onClick={handleSend}
+            disabled={disabled || isStreaming || !input.trim()}
+            title={isStreaming ? 'AI is responding...' : 'Send message'}
           className="font-mono text-xs text-terminal-primary/70 hover:text-terminal-primary px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {isStreaming ? '■' : '↵'}

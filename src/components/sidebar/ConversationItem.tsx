@@ -21,7 +21,7 @@ export function ConversationItem({
     <div
       onClick={onClick}
       className={cn(
-        'flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors duration-100',
+        'group flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors duration-100',
         'font-mono text-xs',
         isActive
           ? 'bg-terminal-primary/10 text-terminal-text'

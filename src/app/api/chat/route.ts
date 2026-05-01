@@ -70,19 +70,20 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }))
 
-    // 如果没有历史消息，添加 system prompt
-    if (aiMessages.length === 0) {
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('system_prompt')
-        .eq('id', conversationId)
-        .single()
+    // 始终从 conversations 表注入 system_prompt（如果存在）
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('system_prompt')
+      .eq('id', conversationId)
+      .single()
 
-      if (conv?.system_prompt) {
-        aiMessages.unshift({
-          role: 'system',
-          content: conv.system_prompt,
-        })
+    if (conv?.system_prompt) {
+      // 查找是否已有 system 消息，有则替换，无则插入到最前
+      const existingSystemIdx = aiMessages.findIndex((m) => m.role === 'system')
+      if (existingSystemIdx >= 0) {
+        aiMessages[existingSystemIdx] = { role: 'system', content: conv.system_prompt }
+      } else {
+        aiMessages.unshift({ role: 'system', content: conv.system_prompt })
       }
     }
 
