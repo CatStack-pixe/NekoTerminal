@@ -1,7 +1,6 @@
 'use client'
 
 import type { Message } from '@/types'
-import { ImagePreview } from './ImagePreview'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
@@ -38,13 +37,6 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
             <span className="text-terminal-dim italic">[EMPTY_TRANSMISSION]</span>
           )}
         </div>
-
-        {/* 图片附件 */}
-        {message.image_url && (
-          <div className="mt-1.5">
-            <ImagePreview src={message.image_url} alt="Attachment" />
-          </div>
-        )}
 
         {/* 时间戳 */}
         <div className="mt-0.5 text-[10px] text-terminal-dim/40">

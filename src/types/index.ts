@@ -28,9 +28,6 @@ export interface Message {
   conversation_id: string
   role: MessageRole
   content: string
-  image_url: string | null
-  image_width: number | null
-  image_height: number | null
   token_count: number | null
   created_at: string
 }
@@ -89,13 +86,6 @@ export interface ConversationItemProps {
 export interface MessageBubbleProps {
   message: Message
   isStreaming?: boolean
-}
-
-export interface ImagePreviewProps {
-  imageUrl: string
-  imageWidth?: number | null
-  imageHeight?: number | null
-  isLoading?: boolean
 }
 
 // ==================== 模型分类器类型 ====================

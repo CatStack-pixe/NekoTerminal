@@ -12,7 +12,6 @@ import { VSCodeShell } from '@/components/ui/DotMatrixBg'
 import { useConversations } from '@/hooks/useConversations'
 import { useMessages } from '@/hooks/useMessages'
 import { useChatStream } from '@/hooks/useChatStream'
-import { useImageUpload } from '@/hooks/useImageUpload'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Conversation } from '@/types'
 
@@ -43,8 +42,6 @@ export default function HomePage() {
     isStreaming,
     sendMessageAsync,
   } = useChatStream()
-
-  const { uploadImage, uploadingImage: _uploadingImage } = useImageUpload()
 
   const activeConversation = conversations?.find(
     (c: Conversation) => c.id === activeConversationId
@@ -90,7 +87,7 @@ export default function HomePage() {
       try {
         await sendMessageAsync({
           conversationId: convId,
-          messages: [{ role: 'user' as const, content, image_url: null }],
+          messages: [{ role: 'user' as const, content }],
           apiUrl,
           apiKey,
           model,
@@ -110,14 +107,6 @@ export default function HomePage() {
       queryClient,
       user?.id,
     ]
-  )
-
-  // 图片上传回调
-  const handleImageUpload = useCallback(
-    (file: File) => {
-      uploadImage(file)
-    },
-    [uploadImage]
   )
 
   // 保存配置
@@ -192,7 +181,6 @@ export default function HomePage() {
 
           <ChatInput
             onSend={handleSend}
-            onImageUpload={handleImageUpload}
             disabled={isStreaming}
             isStreaming={isStreaming}
           />

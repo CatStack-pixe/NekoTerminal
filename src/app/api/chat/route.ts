@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
         conversation_id: conversationId,
         role: 'user',
         content: lastUserMessage.content,
-        image_url: lastUserMessage.image_url ?? null,
       })
       if (userMsgError) {
         console.error('[route.ts] Failed to save user message:', userMsgError)
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
     // 从数据库中获取历史消息，加上当前消息
     const { data: historyMessages } = await serviceClient
       .from('messages')
-      .select('role, content, image_url')
+      .select('role, content')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
       .limit(50)
@@ -130,10 +129,36 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        let sseBuffer = ''
         try {
           while (true) {
             const { done, value } = await reader.read()
             if (done) {
+              // 处理缓冲区中剩余的数据
+              if (sseBuffer.trim()) {
+                const finalLines = sseBuffer.split('\n')
+                for (const line of finalLines) {
+                  if (line.startsWith('data: ')) {
+                    const raw = line.slice(6).trim()
+                    if (raw && raw !== '[DONE]') {
+                      try {
+                        const parsed = JSON.parse(raw)
+                        const token = parsed.choices?.[0]?.delta?.content ?? ''
+                        if (token) {
+                          fullResponse += token
+                          // 发送纯净的 token 给客户端 (JSON 包裹避免换行问题)
+                          controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`))
+                        }
+                      } catch {
+                        // 非 JSON 行，直接转发
+                        fullResponse += raw
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(raw)}\n\n`))
+                      }
+                    }
+                  }
+                }
+              }
+
               // 保存完整的 AI 回复到数据库 (使用 service_role 客户端确保写入)
               if (fullResponse) {
                 await serviceClient
@@ -159,21 +184,30 @@ export async function POST(request: NextRequest) {
               break
             }
 
-            const chunk = decoder.decode(value, { stream: true })
-            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+            // 将新数据追加到缓冲区
+            sseBuffer += decoder.decode(value, { stream: true })
 
-            // 解析并累积 AI 回复内容
-            const lines = chunk.split('\n')
+            // 按行分割，保留最后一个不完整的行
+            const lines = sseBuffer.split('\n')
+            sseBuffer = lines.pop() || ''
+
             for (const line of lines) {
+              if (!line.trim()) continue
               if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim()
-                if (data === '[DONE]') continue
+                const raw = line.slice(6).trim()
+                if (raw === '[DONE]') continue
                 try {
-                  const parsed = JSON.parse(data)
-                  const content = parsed.choices?.[0]?.delta?.content ?? ''
-                  fullResponse += content
+                  const parsed = JSON.parse(raw)
+                  const token = parsed.choices?.[0]?.delta?.content ?? ''
+                  if (token) {
+                    fullResponse += token
+                    // 发送纯净的 token 给客户端 (JSON 包裹避免换行嵌入导致解析异常)
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`))
+                  }
                 } catch {
-                  // 忽略解析错误
+                  // 非 JSON 数据，直接作为文本转发
+                  fullResponse += raw
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(raw)}\n\n`))
                 }
               }
             }
@@ -191,7 +225,11 @@ export async function POST(request: NextRequest) {
               console.error('[route.ts] Failed to save partial assistant message:', partialSaveError)
             }
           }
-          controller.error(error)
+          try {
+            controller.error(error)
+          } catch {
+            // controller 可能已经关闭
+          }
         }
       },
     })

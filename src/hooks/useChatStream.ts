@@ -35,7 +35,7 @@ export function useChatStream() {
       model,
     }: {
       conversationId: string
-      messages: Pick<Message, 'role' | 'content' | 'image_url'>[]
+      messages: Pick<Message, 'role' | 'content'>[]
       apiUrl: string
       apiKey: string
       model: string
@@ -54,7 +54,6 @@ export function useChatStream() {
           messages: messages.map((m) => ({
             role: m.role,
             content: m.content,
-            image_url: m.image_url,
           })),
           apiUrl,
           apiKey,
@@ -79,23 +78,26 @@ export function useChatStream() {
         if (done) break
 
         const chunk = decoder.decode(value, { stream: true })
-        // 处理 SSE 格式: data: <content>\n\n
+        // 处理 SSE 格式: data: <JSON-stringified token>\n\n
+        // 服务端已将 AI 的原始 SSE 解析为纯净 token 并 JSON.stringify 后发送
         const lines = chunk.split('\n')
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6)
+            const data = line.slice(6).trim()
             if (data === '[DONE]') continue
             try {
-              const parsed = JSON.parse(data)
-              const token = parsed.choices?.[0]?.delta?.content || parsed.content || ''
-              if (token) {
+              // 服务端发送的是 JSON.stringify(token)，解析获取原始字符串
+              const token = JSON.parse(data) as string
+              if (token && typeof token === 'string') {
                 fullContent += token
                 setStreamingContent((prev) => prev + token)
               }
             } catch {
-              // 非 JSON 数据，直接作为文本追加
-              fullContent += data
-              setStreamingContent((prev) => prev + data)
+              // JSON 解析失败，直接作为纯文本追加（向后兼容）
+              if (data) {
+                fullContent += data
+                setStreamingContent((prev) => prev + data)
+              }
             }
           }
         }

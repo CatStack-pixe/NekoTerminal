@@ -56,9 +56,6 @@ CREATE TABLE IF NOT EXISTS public.messages (
   conversation_id UUID NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
   role            TEXT NOT NULL CHECK (role IN ('system', 'user', 'assistant')),
   content         TEXT NOT NULL,
-  image_url       TEXT,
-  image_width     INTEGER,
-  image_height    INTEGER,
   token_count     INTEGER,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
