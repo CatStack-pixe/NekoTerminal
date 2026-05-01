@@ -101,7 +101,7 @@ function getFile(abspath: string): VfsNode | null {
 
 interface LogLine {
   text: string
-  type?: 'info' | 'success' | 'error' | 'system'
+  type?: 'info' | 'success' | 'error' | 'system' | 'warn' | 'neon' | 'highlight'
 }
 
 interface WinInstance {
@@ -139,11 +139,37 @@ const BOOT_SEQUENCE: LogLine[] = [
   { text: '[  OK  ] Loading terminal subsystem...', type: 'success' },
   { text: '[  OK  ] Terminal subsystem ready', type: 'success' },
   { text: '', type: 'info' },
-  { text: 'CatStack Terminal v1.0.0 — Transmission Ready', type: 'system' },
+  { text: 'CatStack Terminal v1.0.0 — Transmission Ready', type: 'neon' },
   { text: 'Type "help" for available commands.', type: 'system' },
   { text: 'Type "login" or "window" to sign in.', type: 'system' },
   { text: '', type: 'info' },
+  { text: '─── BOOT FASTFETCH ───', type: 'highlight' },
+  { text: '', type: 'info' },
+  ...FASTFETCH_LINES(),
+  { text: '', type: 'info' },
 ]
+
+// Fastfetch 输出数据，在启动和 fastfetch 命令中复用
+function FASTFETCH_LINES(): LogLine[] {
+  return [
+    { text: '╭─────────────────────────────────────────────────────╮', type: 'info' },
+    { text: '│          ▟█▙                  guest@catstack        │', type: 'info' },
+    { text: '│         ▛▜▜▜█▛                ------------------- │', type: 'info' },
+    { text: '│        ▐████▌  ▟███▙            OS: CatStack OS v1.0.0', type: 'info' },
+    { text: '│        ▝█████▛▜██▚▜█▛          Kernel: Linux 6.8.0-catstack', type: 'info' },
+    { text: '│  ███▙   ▝█████▐█▝██▅ █▙        Uptime: 0d 0h 12m', type: 'info' },
+    { text: '│ █▚▜███▛ ▟█████▌▝████  █▌       Shell: bash 5.2.15', type: 'info' },
+    { text: '│ █▄▝████████████████▛  ▐█▌      Terminal: CatStack v1.0.0', type: 'info' },
+    { text: '│  ▀█▄▝█████████████▛  ▗█▀       CPU: AMD Ryzen 7 (4) @ 2.80GHz', type: 'info' },
+    { text: '│    ▀█▄▝█████████▛  ▗█▌         GPU: VirtIO-GPU 128MB', type: 'info' },
+    { text: '│      ▀█▄▝█████▛  ▗█▀           Memory: 1.2GB / 4.0GB', type: 'info' },
+    { text: '│ ▟█▙      ██▌   ▟█▙             Disk: 6.5GB / 20.0GB', type: 'info' },
+    { text: '│▐▘▝▘▜█▙   ██▌  ▟█▛▀▘▀▜▙         Locale: zh_CN.UTF-8', type: 'info' },
+    { text: '│▐▌  ▝██▙ ▐█▌ ▟█▛   ▐▌         Theme: Dark+ [CatStack]', type: 'info' },
+    { text: '│ ▜▄  ██▘▗█▛▝█▛  ▄▐▘           Resolution: 1920x1080 @ 60Hz', type: 'info' },
+    { text: '╰─────────────────────────────────────────────────────╯', type: 'info' },
+  ]
+}
 
 type Phase = 'boot' | 'ready' | 'login-email'
 
@@ -369,22 +395,7 @@ export function TerminalLogin() {
     } else if (lower === 'uname' || lower === 'uname -a') {
       addLog('Linux catstack 6.8.0-catstack #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux', 'info')
     } else if (lower === 'fastfetch') {
-      addLog('╭─────────────────────────────────────────────────────╮', 'info')
-      addLog('│          ▟█▙                  guest@catstack        │', 'info')
-      addLog('│         ▛▜▜▜█▛                ------------------- │', 'info')
-      addLog('│        ▐████▌  ▟███▙            OS: CatStack OS v1.0.0', 'info')
-      addLog('│        ▝█████▛▜██▚▜█▛          Kernel: Linux 6.8.0-catstack', 'info')
-      addLog('│  ███▙   ▝█████▐█▝██▅ █▙        Uptime: 0d 0h 12m', 'info')
-      addLog('│ █▚▜███▛ ▟█████▌▝████  █▌       Shell: bash 5.2.15', 'info')
-      addLog('│ █▄▝████████████████▛  ▐█▌      Terminal: CatStack v1.0.0', 'info')
-      addLog('│  ▀█▄▝█████████████▛  ▗█▀       CPU: AMD Ryzen 7 (4) @ 2.80GHz', 'info')
-      addLog('│    ▀█▄▝█████████▛  ▗█▌         GPU: VirtIO-GPU 128MB', 'info')
-      addLog('│      ▀█▄▝█████▛  ▗█▀           Memory: 1.2GB / 4.0GB', 'info')
-      addLog('│ ▟█▙      ██▌   ▟█▙             Disk: 6.5GB / 20.0GB', 'info')
-      addLog('│▐▘▝▘▜█▙   ██▌  ▟█▛▀▘▀▜▙         Locale: zh_CN.UTF-8', 'info')
-      addLog('│▐▌  ▝██▙ ▐█▌ ▟█▛   ▐▌         Theme: Dark+ [CatStack]', 'info')
-      addLog('│ ▜▄  ██▘▗█▛▝█▛  ▄▐▘           Resolution: 1920x1080 @ 60Hz', 'info')
-      addLog('╰─────────────────────────────────────────────────────╯', 'info')
+      FASTFETCH_LINES().forEach((l) => addLog(l.text, l.type))
     } else if (lower === 'matrix') {
       addLog('Wake up, Neo...', 'system')
       addLog('The Matrix has you...', 'system')
@@ -561,7 +572,13 @@ export function TerminalLogin() {
                     ? 'text-[#569cd6]'
                     : line.type === 'info'
                       ? 'text-[#dcdcaa]'
-                      : 'text-[#cccccc]'
+                      : line.type === 'warn'
+                        ? 'text-[#e5c07b]'
+                        : line.type === 'neon'
+                          ? 'text-[#56b6c2]'
+                          : line.type === 'highlight'
+                            ? 'text-[#c678dd]'
+                            : 'text-[#cccccc]'
             }`}
           >
             {line.text || '\u00A0'}
