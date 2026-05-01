@@ -44,6 +44,7 @@ export default function HomePage() {
     streamingContent,
     isStreaming,
     sendMessageAsync,
+    clearStream,
   } = useChatStream()
 
   const activeConversation = conversations?.find(
@@ -103,8 +104,10 @@ export default function HomePage() {
         terminalLog({ type: 'error', content: `SEND FAILED: ${err instanceof Error ? err.message : String(err)}`, conversationId: convId })
       }
 
-      queryClient.invalidateQueries({ queryKey: ['messages', convId] })
-      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] })
+      // 等待 DB 数据刷新后再清除流式临时气泡，避免消息闪烁/丢失
+      await queryClient.invalidateQueries({ queryKey: ['messages', convId] })
+      await queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] })
+      clearStream()
     },
     [
       activeConversationId,
@@ -112,6 +115,7 @@ export default function HomePage() {
       createConversation,
       sendMessageAsync,
       queryClient,
+      clearStream,
       user?.id,
       terminalLog,
     ]

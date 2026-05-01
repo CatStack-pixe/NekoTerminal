@@ -24,6 +24,11 @@ export function useChatStream() {
     setIsStreaming(false)
   }, [])
 
+  // 流结束后只标记停止，不清空内容 —— 等 DB refetch 后再调用 clearStream
+  const finalizeStream = useCallback(() => {
+    setIsStreaming(false)
+  }, [])
+
   const abort = useCallback(() => {
     abortControllerRef.current?.abort()
     clearStream()
@@ -123,8 +128,9 @@ export function useChatStream() {
 
       return fullContent
     },
-    onSuccess: (fullContent) => {
-      setIsStreaming(false)
+    onSuccess: (_fullContent) => {
+      // 不在 onSuccess 中清除 streamingContent/设置 isStreaming
+      // 由调用方在 DB refetch 后调用 clearStream 完成最终清理
     },
     onError: (error) => {
       setIsStreaming(false)
@@ -140,6 +146,7 @@ export function useChatStream() {
     isSending: streamMutation.isPending,
     error: streamMutation.error,
     clearStream,
+    finalizeStream,
     abort,
   }
 }
