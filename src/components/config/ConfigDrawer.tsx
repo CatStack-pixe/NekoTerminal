@@ -172,6 +172,7 @@ export function ConfigDrawer({
             onSubmit={(e) => e.preventDefault()}
             autoComplete="off"
           >
+            <input type="text" name="username" autoComplete="username" className="hidden" aria-hidden="true" tabIndex={-1} />
             <label className="font-mono text-xs font-semibold text-terminal-dim uppercase tracking-wider">
               API 秘钥 (可点击上方链接获取)
             </label>
