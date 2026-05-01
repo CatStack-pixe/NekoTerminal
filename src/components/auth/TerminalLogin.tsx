@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react'
 import { useAuth } from './AuthProvider'
 import { FloatingWindow } from '@/components/ui/FloatingWindow'
+import { useTerminalLogs } from '@/lib/terminal-log-context'
 
 // ============================================================
 // 虚拟文件系统 (VFS) —— ls / cat / dir 统一数据源
@@ -136,6 +137,7 @@ type Phase = 'boot' | 'ready' | 'login-email'
 
 export function TerminalLogin() {
   const { signInWithEmail, verifyOtp } = useAuth()
+  const { append: globalLog } = useTerminalLogs()
   const [phase, setPhase] = useState<Phase>('boot')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [bootIndex, setBootIndex] = useState(0)
@@ -172,7 +174,8 @@ export function TerminalLogin() {
       return
     }
     const timer = setTimeout(() => {
-      setLogs((prev) => [...prev, BOOT_SEQUENCE[bootIndex]])
+      const line = BOOT_SEQUENCE[bootIndex]
+      addLog(line.text, line.type)
       setBootIndex((i) => i + 1)
     }, 120)
     return () => clearTimeout(timer)
@@ -195,6 +198,11 @@ export function TerminalLogin() {
     setLogs((prev) => {
       if (prev.length > 0 && prev[prev.length - 1].text === text) return prev
       return [...prev, { text, type }]
+    })
+    // 同步到全局 DebugTerminal
+    globalLog({
+      type: type === 'success' ? 'info' : type === 'system' ? 'system' : type === 'error' ? 'error' : 'info',
+      content: text,
     })
   }
 
