@@ -5,12 +5,18 @@ import { createServiceClient } from '@/lib/supabase/server'
 // Netlify Functions 默认最大 10s，流式响应需要设为更长
 export const maxDuration = 30
 
+const LOG_PREFIX = '[catstack::server]'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { conversationId, messages, apiUrl, apiKey, model } = body
+    const shortId = conversationId?.slice(0, 6) ?? '????'
+
+    console.log(`${LOG_PREFIX} REQ conv=${shortId} model=${model} url=${apiUrl}`)
 
     if (!conversationId || !messages?.length || !apiUrl || !apiKey || !model) {
+      console.warn(`${LOG_PREFIX} BAD_REQUEST missing fields`)
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -27,11 +33,13 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      console.warn(`${LOG_PREFIX} UNAUTHORIZED`)
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       })
     }
+    console.log(`${LOG_PREFIX} AUTH user=${user.id.slice(0, 8)}`)
 
     // 验证对话归属
     const { data: conversation } = await supabase
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!conversation) {
+      console.warn(`${LOG_PREFIX} NOT_FOUND conv=${shortId}`)
       return new Response(JSON.stringify({ error: 'Conversation not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
@@ -57,7 +66,9 @@ export async function POST(request: NextRequest) {
         content: lastUserMessage.content,
       })
       if (userMsgError) {
-        console.error('[route.ts] Failed to save user message:', userMsgError)
+        console.error(`${LOG_PREFIX} DB_WRITE_ERROR user_msg:`, JSON.stringify(userMsgError))
+      } else {
+        console.log(`${LOG_PREFIX} DB user_msg SAVED (${lastUserMessage.content.slice(0, 50)}...)`)
       }
     }
 
@@ -93,6 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用 AI API (兼容 OpenAI 格式)
+    console.log(`${LOG_PREFIX} AI_REQ model=${model} msgCount=${aiMessages.length}`)
+
     const aiResponse = await fetch(`${apiUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -108,11 +121,13 @@ export async function POST(request: NextRequest) {
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text()
+      console.error(`${LOG_PREFIX} AI_ERROR status=${aiResponse.status}: ${errorText}`)
       return new Response(JSON.stringify({ error: `AI API error: ${errorText}` }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       })
     }
+    console.log(`${LOG_PREFIX} AI_STREAM START`)
 
     // 创建 TransformStream 用于流式转发 + 捕获完整内容
     const reader = aiResponse.body?.getReader()
@@ -161,6 +176,7 @@ export async function POST(request: NextRequest) {
 
               // 保存完整的 AI 回复到数据库 (使用 service_role 客户端确保写入)
               if (fullResponse) {
+                console.log(`${LOG_PREFIX} DB ai_msg SAVING len=${fullResponse.length}`)
                 await serviceClient
                   .from('messages')
                   .insert({
@@ -176,6 +192,8 @@ export async function POST(request: NextRequest) {
                   .update({ updated_at: new Date().toISOString() })
                   .eq('id', conversationId)
                   .throwOnError()
+
+                console.log(`${LOG_PREFIX} STREAM COMPLETE total=${fullResponse.length} chars`)
               }
 
               // 发送结束信号
@@ -213,7 +231,7 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (error) {
-          console.error('Stream error:', error)
+          console.error(`${LOG_PREFIX} STREAM_ERROR:`, error)
           // 即使出错，也尝试保存已收到的部分
           if (fullResponse) {
             const { error: partialSaveError } = await serviceClient.from('messages').insert({
@@ -222,7 +240,7 @@ export async function POST(request: NextRequest) {
               content: fullResponse + '\n\n[TRANSMISSION INTERRUPTED]',
             })
             if (partialSaveError) {
-              console.error('[route.ts] Failed to save partial assistant message:', partialSaveError)
+              console.error(`${LOG_PREFIX} DB_PARTIAL_SAVE_ERROR:`, JSON.stringify(partialSaveError))
             }
           }
           try {
@@ -243,7 +261,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Chat API error:', error)
+    console.error(`${LOG_PREFIX} FATAL:`, error)
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Internal server error',

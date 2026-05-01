@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { useTerminalLogs } from '@/lib/terminal-log-context'
 import type { Message } from '@/types'
 
 interface ChatStreamOptions {
@@ -15,6 +16,8 @@ export function useChatStream() {
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const { append: terminalLog } = useTerminalLogs()
+  const tokenBatchRef = useRef('')
 
   const clearStream = useCallback(() => {
     setStreamingContent('')
@@ -62,8 +65,11 @@ export function useChatStream() {
         signal: controller.signal,
       })
 
+      terminalLog({ type: 'system', content: `STREAM START (model: ${model})`, conversationId })
+
       if (!response.ok) {
         const errorBody = await response.text()
+        terminalLog({ type: 'error', content: `HTTP ERROR ${response.status}: ${errorBody}`, conversationId })
         throw new Error(errorBody || `HTTP ${response.status}`)
       }
 
@@ -91,6 +97,12 @@ export function useChatStream() {
               if (token && typeof token === 'string') {
                 fullContent += token
                 setStreamingContent((prev) => prev + token)
+                // 批量记录 token，每积累 8+ 个字符输出一次
+                tokenBatchRef.current += token
+                if (tokenBatchRef.current.length >= 8) {
+                  terminalLog({ type: 'token', content: tokenBatchRef.current, conversationId })
+                  tokenBatchRef.current = ''
+                }
               }
             } catch {
               // JSON 解析失败，直接作为纯文本追加（向后兼容）
@@ -101,6 +113,12 @@ export function useChatStream() {
             }
           }
         }
+      }
+
+      // 输出剩余的 token 批量
+      if (tokenBatchRef.current) {
+        terminalLog({ type: 'token', content: tokenBatchRef.current, conversationId })
+        tokenBatchRef.current = ''
       }
 
       return fullContent

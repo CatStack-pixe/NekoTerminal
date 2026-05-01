@@ -9,15 +9,18 @@ import { MessageList } from '@/components/chat/MessageList'
 import { ChatInput } from '@/components/chat/ChatInput'
 import { ConfigDrawer } from '@/components/config/ConfigDrawer'
 import { VSCodeShell } from '@/components/ui/DotMatrixBg'
+import { DebugTerminal } from '@/components/ui/DebugTerminal'
 import { useConversations } from '@/hooks/useConversations'
 import { useMessages } from '@/hooks/useMessages'
 import { useChatStream } from '@/hooks/useChatStream'
+import { useTerminalLogs } from '@/lib/terminal-log-context'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Conversation } from '@/types'
 
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth()
   const queryClient = useQueryClient()
+  const { append: terminalLog } = useTerminalLogs()
 
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
@@ -54,10 +57,11 @@ export default function HomePage() {
       {
         onSuccess: (conv) => {
           setActiveConversationId(conv.id)
+          terminalLog({ type: 'system', content: `NEW CONVERSATION: ${conv.title}`, conversationId: conv.id })
         },
       }
     )
-  }, [createConversation])
+  }, [createConversation, terminalLog])
 
   // 发送消息
   const handleSend = useCallback(
@@ -84,6 +88,9 @@ export default function HomePage() {
         model = conv.model
       }
 
+      terminalLog({ type: 'user', content, conversationId: convId })
+      terminalLog({ type: 'info', content: `MODEL: ${model} | URL: ${apiUrl}`, conversationId: convId })
+
       try {
         await sendMessageAsync({
           conversationId: convId,
@@ -92,8 +99,8 @@ export default function HomePage() {
           apiKey,
           model,
         })
-      } catch {
-        // 错误已在 hook 中处理
+      } catch (err) {
+        terminalLog({ type: 'error', content: `SEND FAILED: ${err instanceof Error ? err.message : String(err)}`, conversationId: convId })
       }
 
       queryClient.invalidateQueries({ queryKey: ['messages', convId] })
@@ -106,6 +113,7 @@ export default function HomePage() {
       sendMessageAsync,
       queryClient,
       user?.id,
+      terminalLog,
     ]
   )
 
@@ -121,8 +129,9 @@ export default function HomePage() {
         api_key: data.apiKey,
         system_prompt: data.systemPrompt,
       })
+      terminalLog({ type: 'info', content: `CONFIG SAVED: ${data.title} / ${data.model}`, conversationId: activeConversationId })
     },
-    [activeConversationId, updateConversation]
+    [activeConversationId, updateConversation, terminalLog]
   )
 
   // ==================== 未登录态 ====================
@@ -186,6 +195,9 @@ export default function HomePage() {
           />
         </div>
       </div>
+
+      {/* 底部终端面板 */}
+      <DebugTerminal />
 
       {/* 配置抽屉 */}
       <ConfigDrawer

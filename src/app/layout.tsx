@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { QueryProvider } from '@/components/providers/QueryProvider'
+import { TerminalLogProvider } from '@/lib/terminal-log-context'
 
 export const metadata: Metadata = {
   title: 'CatStack // Terminal',
@@ -21,7 +22,9 @@ export default function RootLayout({
       <body className="bg-terminal-bg text-terminal-text font-mono antialiased">
         <QueryProvider>
           <AuthProvider>
-            {children}
+            <TerminalLogProvider>
+              {children}
+            </TerminalLogProvider>
           </AuthProvider>
         </QueryProvider>
       </body>
