@@ -4,9 +4,10 @@ interface ChatHeaderProps {
   title?: string
   onToggleSidebar?: () => void
   onOpenConfig?: () => void
+  onSignOut?: () => void
 }
 
-export function ChatHeader({ title, onToggleSidebar, onOpenConfig }: ChatHeaderProps) {
+export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut }: ChatHeaderProps) {
   return (
     <div className="h-8 flex items-center justify-between px-3 border-b border-terminal-border bg-terminal-elevated shrink-0">
       {/* 左侧：文件路径风格 */}
@@ -18,6 +19,14 @@ export function ChatHeader({ title, onToggleSidebar, onOpenConfig }: ChatHeaderP
       </div>
 
       {/* 右侧 */}
+      {onSignOut && (
+        <button
+          onClick={onSignOut}
+          className="font-mono text-[10px] text-terminal-dim hover:text-terminal-red transition-colors px-2 shrink-0"
+        >
+          SIGNOUT
+        </button>
+      )}
       {onOpenConfig && (
         <button
           onClick={onOpenConfig}

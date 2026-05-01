@@ -18,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Conversation } from '@/types'
 
 export default function HomePage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, signOut } = useAuth()
   const queryClient = useQueryClient()
   const { append: terminalLog } = useTerminalLogs()
 
@@ -177,6 +177,7 @@ export default function HomePage() {
             title={activeConversation?.title ?? 'SELECT TRANSMISSION'}
             onToggleSidebar={() => {}}
             onOpenConfig={() => setConfigOpen(true)}
+            onSignOut={signOut}
           />
 
           <MessageList
