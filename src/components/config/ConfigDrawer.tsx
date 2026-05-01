@@ -136,17 +136,17 @@ export function ConfigDrawer({
             <Input
               value={apiUrl}
               onChange={(e) => save('apiUrl', e.target.value)}
-              placeholder="https://vipapi.online/v1/chat/completions"
+              placeholder="https://vipapi.online/v1"
             />
             <div className="font-mono text-[11px] text-terminal-muted tracking-wide">
-              已自动适配URL地址:{' '}
+              上方框直接填入:{' '}
               <a
                 href="https://vipapi.online/register?aff=SK6V"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-terminal-primary hover:underline"
               >
-                https://vipapi.online/
+                https://vipapi.online/register?aff=SK6V
               </a>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function ConfigDrawer({
               </button>
             </div>
             <div className="font-mono text-[11px] text-terminal-muted tracking-wide">
-              如果 Gemini 不可用，可切换成 grok-4.2
+              推荐: grok-4.2
             </div>
           </div>
 
