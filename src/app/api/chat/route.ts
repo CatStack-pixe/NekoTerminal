@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 // Netlify Functions 默认最大 10s，流式响应需要设为更长
 export const maxDuration = 30
@@ -17,6 +18,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServerClient()
+    // service_role 客户端用于写入（绕过 RLS，确保消息能持久化）
+    const serviceClient = await createServiceClient()
 
     // 验证用户身份
     const {
@@ -45,20 +48,23 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 保存用户消息到数据库
+    // 保存用户消息到数据库 (使用 service_role 客户端确保写入)
     const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
     if (lastUserMessage) {
-      await supabase.from('messages').insert({
+      const { error: userMsgError } = await serviceClient.from('messages').insert({
         conversation_id: conversationId,
         role: 'user',
         content: lastUserMessage.content,
         image_url: lastUserMessage.image_url ?? null,
       })
+      if (userMsgError) {
+        console.error('[route.ts] Failed to save user message:', userMsgError)
+      }
     }
 
     // 构建发送给 AI 的消息列表
     // 从数据库中获取历史消息，加上当前消息
-    const { data: historyMessages } = await supabase
+    const { data: historyMessages } = await serviceClient
       .from('messages')
       .select('role, content, image_url')
       .eq('conversation_id', conversationId)
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
     }))
 
     // 始终从 conversations 表注入 system_prompt（如果存在）
-    const { data: conv } = await supabase
+    const { data: conv } = await serviceClient
       .from('conversations')
       .select('system_prompt')
       .eq('id', conversationId)
@@ -128,9 +134,9 @@ export async function POST(request: NextRequest) {
           while (true) {
             const { done, value } = await reader.read()
             if (done) {
-              // 保存完整的 AI 回复到数据库
+              // 保存完整的 AI 回复到数据库 (使用 service_role 客户端确保写入)
               if (fullResponse) {
-                await supabase
+                await serviceClient
                   .from('messages')
                   .insert({
                     conversation_id: conversationId,
@@ -140,7 +146,7 @@ export async function POST(request: NextRequest) {
                   .throwOnError()
 
                 // 更新对话的时间戳
-                await supabase
+                await serviceClient
                   .from('conversations')
                   .update({ updated_at: new Date().toISOString() })
                   .eq('id', conversationId)
@@ -176,11 +182,14 @@ export async function POST(request: NextRequest) {
           console.error('Stream error:', error)
           // 即使出错，也尝试保存已收到的部分
           if (fullResponse) {
-            await supabase.from('messages').insert({
+            const { error: partialSaveError } = await serviceClient.from('messages').insert({
               conversation_id: conversationId,
               role: 'assistant',
               content: fullResponse + '\n\n[TRANSMISSION INTERRUPTED]',
             })
+            if (partialSaveError) {
+              console.error('[route.ts] Failed to save partial assistant message:', partialSaveError)
+            }
           }
           controller.error(error)
         }
