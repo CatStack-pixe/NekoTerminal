@@ -167,7 +167,11 @@ export function ConfigDrawer({
           </div>
 
           {/* API 密钥 */}
-          <div className="flex flex-col gap-1.5">
+          <form
+            className="flex flex-col gap-1.5"
+            onSubmit={(e) => e.preventDefault()}
+            autoComplete="off"
+          >
             <label className="font-mono text-xs font-semibold text-terminal-dim uppercase tracking-wider">
               API 秘钥 (可点击上方链接获取)
             </label>
@@ -176,12 +180,13 @@ export function ConfigDrawer({
               value={apiKey}
               onChange={(e) => save('apiKey', e.target.value)}
               placeholder="sk-......"
+              autoComplete="new-password"
               className="w-full font-mono text-[13px] bg-[#0d0d18] text-terminal-text border border-terminal-border px-2.5 py-2.5 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50 caret-terminal-primary"
             />
             <div className="font-mono text-[11px] text-terminal-muted tracking-wide">
               所有信息仅保存在数据库中
             </div>
-          </div>
+          </form>
 
           {/* 模型 */}
           <div className="flex flex-col gap-1.5">
