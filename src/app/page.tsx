@@ -144,11 +144,8 @@ export default function HomePage() {
   // ==================== 未登录态 ====================
   if (!authLoading && !user) {
     return (
-      <VSCodeShell connectionStatus="idle">
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TerminalLogin />
-          <DebugTerminal activeConversation={null} messageCount={0} />
-        </div>
+      <VSCodeShell>
+        <TerminalLogin />
       </VSCodeShell>
     )
   }

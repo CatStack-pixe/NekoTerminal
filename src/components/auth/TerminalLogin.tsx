@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react'
 import { useAuth } from './AuthProvider'
 import { FloatingWindow } from '@/components/ui/FloatingWindow'
-import { useTerminalLogs } from '@/lib/terminal-log-context'
 
 // ============================================================
 // 虚拟文件系统 (VFS) —— ls / cat / dir 统一数据源
@@ -120,14 +119,27 @@ const WINDOW_TYPES = ['login', 'info', 'settings', 'files', 'processes']
 
 const BOOT_SEQUENCE: LogLine[] = [
   { text: '[  OK  ] Initializing kernel modules...', type: 'success' },
-  { text: '[  OK  ] Mounting filesystems...', type: 'success' },
+  { text: '[  OK  ] Mounting filesystems (ext4 + overlay)...', type: 'success' },
   { text: '[  OK  ] Starting CatStack daemon v1.0.0', type: 'success' },
-  { text: '[  OK  ] Network interface eth0: 192.168.1.100/24', type: 'success' },
-  { text: '[ INFO ] Loading terminal subsystem...', type: 'info' },
-  { text: '[  OK  ] Terminal subsystem ready', type: 'success' },
-  { text: '[ INFO ] Waiting for authentication...', type: 'system' },
+  { text: '[  OK  ] System clock synchronized (NTP)', type: 'success' },
+  { text: '[  OK  ] Enabling swap (2.0 GB)', type: 'success' },
   { text: '', type: 'info' },
-  { text: 'CatStack Terminal v1.0.0', type: 'system' },
+  { text: '[ PERF ] Booting on 4 vCores @ 2.80GHz', type: 'info' },
+  { text: '[ PERF ] Memory: 1.2GB / 4.0GB available', type: 'info' },
+  { text: '[ DB   ] Connecting to Supabase postgres...', type: 'info' },
+  { text: '[ DB   ] Pool health: 20/20 connections ready', type: 'success' },
+  { text: '[ DB   ] Row-Level Security enabled', type: 'info' },
+  { text: '[ DB   ] Realtime subscription channel open', type: 'success' },
+  { text: '', type: 'info' },
+  { text: '[ NET  ] Network interface eth0: 192.168.1.100/24', type: 'success' },
+  { text: '[ NET  ] DNS resolver: 8.8.8.8, 1.1.1.1', type: 'info' },
+  { text: '[ NET  ] TLS 1.3 enabled for all outbound', type: 'success' },
+  { text: '[ WARN ] Firewall rule #42 (debug port 9229) inactive', type: 'info' },
+  { text: '', type: 'info' },
+  { text: '[  OK  ] Loading terminal subsystem...', type: 'success' },
+  { text: '[  OK  ] Terminal subsystem ready', type: 'success' },
+  { text: '', type: 'info' },
+  { text: 'CatStack Terminal v1.0.0 — Transmission Ready', type: 'system' },
   { text: 'Type "help" for available commands.', type: 'system' },
   { text: 'Type "login" or "window" to sign in.', type: 'system' },
   { text: '', type: 'info' },
@@ -137,7 +149,6 @@ type Phase = 'boot' | 'ready' | 'login-email'
 
 export function TerminalLogin() {
   const { signInWithEmail, verifyOtp } = useAuth()
-  const { append: globalLog } = useTerminalLogs()
   const [phase, setPhase] = useState<Phase>('boot')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [bootIndex, setBootIndex] = useState(0)
@@ -198,11 +209,6 @@ export function TerminalLogin() {
     setLogs((prev) => {
       if (prev.length > 0 && prev[prev.length - 1].text === text) return prev
       return [...prev, { text, type }]
-    })
-    // 同步到全局 DebugTerminal
-    globalLog({
-      type: type === 'success' ? 'info' : type === 'system' ? 'system' : type === 'error' ? 'error' : 'info',
-      content: text,
     })
   }
 
