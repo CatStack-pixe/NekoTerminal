@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  # @netlify/plugin-nextjs 自动管理 publish 目录，不需要手动指定
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@supabase/supabase-js", "@aws-sdk/client-s3", "pg"]

@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================== CSS 变量 ==================== */
+:root {
+  --bg: #1e1e1e;
+  --text: #cccccc;
+}
+
+/* ==================== 基础重置 ==================== */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-size: 14px;
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  body {
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono',
+      'Source Code Pro', Consolas, 'Courier New', monospace;
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a {
+    color: #569cd6;
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: #75b8f5;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 0;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}
+
+/* ==================== VS Code 终端选择高亮 ==================== */
+::selection {
+  background: #264f78;
+  color: #e0e0e0;
+}
+
+/* ==================== 终端分隔线 ==================== */
+@layer components {
+  .vscode-divider {
+    border: none;
+    border-top: 1px solid #3c3c3c;
+    margin: 4px 0;
+  }
+}
+
+/* ==================== 滚动条 ==================== */
+@layer components {
+  .terminal-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .terminal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .terminal-scroll::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 0;
+  }
+
+  .terminal-scroll::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}
+
+/* ==================== 光标闪烁 ==================== */
+@layer utilities {
+  .cursor-blink {
+    animation: blinkCursor 1s step-end infinite;
+  }
+
+  .animate-blink {
+    animation: blinkCursor 1s step-end infinite;
+  }
+}
+
+@keyframes blinkCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
