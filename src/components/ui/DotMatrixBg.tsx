@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from 'react'
 
-export function VSCodeShell({ children }: { children: React.ReactNode }) {
+interface VSCodeShellProps {
+  children: React.ReactNode
+  /** 连接状态 */
+  connectionStatus?: 'idle' | 'connecting' | 'streaming' | 'error'
+}
+
+export function VSCodeShell({ children, connectionStatus = 'idle' }: VSCodeShellProps) {
   const [time, setTime] = useState('--:--:--')
 
   useEffect(() => {
@@ -23,9 +29,34 @@ export function VSCodeShell({ children }: { children: React.ReactNode }) {
           <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
           <span className="w-3 h-3 rounded-full bg-[#28c840]" />
         </div>
-        <span className="text-[11px] text-[#888] font-mono tracking-wide">
-          CatStack — Visual Studio Code
-        </span>
+        <div className="flex items-center gap-3">
+          {/* 连接状态指示灯 */}
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{
+              backgroundColor:
+                connectionStatus === 'streaming' ? '#28c840' :
+                connectionStatus === 'connecting' ? '#febc2e' :
+                connectionStatus === 'error' ? '#ff5f57' :
+                '#555',
+              boxShadow:
+                connectionStatus === 'streaming' ? '0 0 6px #28c840' :
+                connectionStatus === 'connecting' ? '0 0 6px #febc2e' :
+                connectionStatus === 'error' ? '0 0 6px #ff5f57' :
+                'none',
+              transition: 'all 0.3s ease',
+            }}
+            title={
+              connectionStatus === 'idle' ? 'IDLE' :
+              connectionStatus === 'connecting' ? 'CONNECTING' :
+              connectionStatus === 'streaming' ? 'STREAMING' :
+              'ERROR'
+            }
+          />
+          <span className="text-[11px] text-[#888] font-mono tracking-wide">
+            CatStack — Visual Studio Code
+          </span>
+        </div>
         <span className="text-[11px] text-[#888] font-mono" suppressHydrationWarning>
           {time}
         </span>

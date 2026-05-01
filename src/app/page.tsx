@@ -24,6 +24,7 @@ export default function HomePage() {
 
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
+  const [traceMode, setTraceMode] = useState(false)
 
   const {
     conversations,
@@ -43,6 +44,8 @@ export default function HomePage() {
   const {
     streamingContent,
     isStreaming,
+    isSending,
+    error: streamError,
     sendMessageAsync,
     clearStream,
   } = useChatStream()
@@ -163,7 +166,14 @@ export default function HomePage() {
 
   // ==================== 主界面 ====================
   return (
-    <VSCodeShell>
+    <VSCodeShell
+      connectionStatus={
+        isStreaming ? 'streaming' :
+        (isSending || createConversation.isPending) ? 'connecting' :
+        streamError ? 'error' :
+        'idle'
+      }
+    >
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文件资源管理器风格侧边栏 */}
         <Sidebar
@@ -202,7 +212,22 @@ export default function HomePage() {
       </div>
 
       {/* 底部终端面板 */}
-      <DebugTerminal />
+      <DebugTerminal
+        activeConversation={
+          activeConversation
+            ? {
+                id: activeConversation.id,
+                title: activeConversation.title,
+                model: activeConversation.model,
+                api_url: activeConversation.api_url,
+                created_at: activeConversation.created_at,
+              }
+            : null
+        }
+        messageCount={messages?.length ?? 0}
+        traceMode={traceMode}
+        onToggleTrace={() => setTraceMode((prev) => !prev)}
+      />
 
       {/* 配置抽屉 */}
       <ConfigDrawer

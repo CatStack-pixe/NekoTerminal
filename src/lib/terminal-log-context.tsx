@@ -2,12 +2,16 @@
 
 import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react'
 
+export type TerminalLogType = 'system' | 'user' | 'ai' | 'error' | 'info' | 'token' | 'network' | 'db' | 'perf' | 'warn' | 'debug'
+
 export interface TerminalLogEntry {
   id: number
   timestamp: string
-  type: 'system' | 'user' | 'ai' | 'error' | 'info' | 'token'
+  type: TerminalLogType
   content: string
   conversationId?: string
+  /** 结构化附加数据，用于详情展示 */
+  meta?: Record<string, unknown>
 }
 
 type TerminalLogAction =
@@ -30,8 +34,8 @@ function terminalLogReducer(state: TerminalLogEntry[], action: TerminalLogAction
           hour12: false,
         }),
       }
-      // 只保留最近 500 条
-      return [...state.slice(-499), entry]
+  // 只保留最近 800 条（更多以容纳调试输出）
+      return [...state.slice(-799), entry]
     }
     case 'CLEAR':
       return []
