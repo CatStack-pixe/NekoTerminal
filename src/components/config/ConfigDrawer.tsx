@@ -60,23 +60,22 @@ export function ConfigDrawer({
   // 实时保存：任一字段变化即写入 conversation
   const save = useCallback(
     (field: string, value: string) => {
-      if (!conversation) return
-      const data: Record<string, string> = {}
-      data[field] = value
-      // 将当前所有值一并提交
-      const payload = {
-        title: conversation.title,
-        model: field === 'model' ? value : model,
-        apiUrl: field === 'apiUrl' ? value : apiUrl,
-        apiKey: field === 'apiKey' ? value : apiKey,
-        systemPrompt: field === 'systemPrompt' ? value : systemPrompt,
-      }
-      // 同步本地状态
+      // 先同步本地状态（无论是否有 conversation，输入框必须响应）
       if (field === 'apiUrl') setApiUrl(value)
       if (field === 'apiKey') setApiKey(value)
       if (field === 'model') setModel(value)
       if (field === 'systemPrompt') setSystemPrompt(value)
-      onSave?.(payload)
+      // 有 conversation 时才回传保存
+      if (conversation) {
+        const payload = {
+          title: conversation.title,
+          model: field === 'model' ? value : model,
+          apiUrl: field === 'apiUrl' ? value : apiUrl,
+          apiKey: field === 'apiKey' ? value : apiKey,
+          systemPrompt: field === 'systemPrompt' ? value : systemPrompt,
+        }
+        onSave?.(payload)
+      }
     },
     [conversation, apiUrl, apiKey, model, systemPrompt, onSave]
   )
