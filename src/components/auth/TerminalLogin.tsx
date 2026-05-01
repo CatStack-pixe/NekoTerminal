@@ -112,8 +112,8 @@ interface WinInstance {
 
 const COMMANDS = [
   'help', 'login', 'window', 'clear', 'whoami',
-  'date', 'echo', 'ls', 'dir', 'uname', 'cat', 'neofetch',
-  'pwd', 'uptime',
+  'date', 'echo', 'ls', 'dir', 'uname', 'cat', 'fastfetch',
+  'pwd', 'uptime', 'matrix', 'eject',
 ]
 const WINDOW_TYPES = ['login', 'info', 'settings', 'files', 'processes']
 
@@ -333,7 +333,7 @@ export function TerminalLogin() {
       addLog('  dir                            List files (alias of ls)', 'info')
       addLog('  uname [-a]                     System info', 'info')
       addLog('  cat [file]                     Read a file', 'info')
-      addLog('  neofetch                       System overview', 'info')
+      addLog('  fastfetch                      System overview (hardware info)', 'info')
       addLog('  pwd                            Print work dir', 'info')
       addLog('  uptime                         System uptime', 'info')
       addLog('  mkdir [dir]                    Create directory', 'info')
@@ -368,13 +368,47 @@ export function TerminalLogin() {
       addLog(`up ${m}m ${s}s, 1 user, load average: 0.08, 0.12, 0.15`, 'info')
     } else if (lower === 'uname' || lower === 'uname -a') {
       addLog('Linux catstack 6.8.0-catstack #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux', 'info')
-    } else if (lower === 'neofetch') {
-      addLog('       .---.        guest@catstack', 'info')
-      addLog('      /     \\       --------------------', 'info')
-      addLog('      \\\\.@.@//       OS: CatStack OS v1.0.0', 'info')
-      addLog("       \\\\_-_//        Kernel: Linux 6.8.0-catstack", 'info')
-      addLog('        \\___/        Shell: bash 5.2.15', 'info')
-      addLog('                    Terminal: CatStack Terminal', 'info')
+    } else if (lower === 'fastfetch') {
+      addLog('╭─────────────────────────────────────────────────────╮', 'info')
+      addLog('│          ▟█▙                  guest@catstack        │', 'info')
+      addLog('│         ▛▜▜▜█▛                ------------------- │', 'info')
+      addLog('│        ▐████▌  ▟███▙            OS: CatStack OS v1.0.0', 'info')
+      addLog('│        ▝█████▛▜██▚▜█▛          Kernel: Linux 6.8.0-catstack', 'info')
+      addLog('│  ███▙   ▝█████▐█▝██▅ █▙        Uptime: 0d 0h 12m', 'info')
+      addLog('│ █▚▜███▛ ▟█████▌▝████  █▌       Shell: bash 5.2.15', 'info')
+      addLog('│ █▄▝████████████████▛  ▐█▌      Terminal: CatStack v1.0.0', 'info')
+      addLog('│  ▀█▄▝█████████████▛  ▗█▀       CPU: AMD Ryzen 7 (4) @ 2.80GHz', 'info')
+      addLog('│    ▀█▄▝█████████▛  ▗█▌         GPU: VirtIO-GPU 128MB', 'info')
+      addLog('│      ▀█▄▝█████▛  ▗█▀           Memory: 1.2GB / 4.0GB', 'info')
+      addLog('│ ▟█▙      ██▌   ▟█▙             Disk: 6.5GB / 20.0GB', 'info')
+      addLog('│▐▘▝▘▜█▙   ██▌  ▟█▛▀▘▀▜▙         Locale: zh_CN.UTF-8', 'info')
+      addLog('│▐▌  ▝██▙ ▐█▌ ▟█▛   ▐▌         Theme: Dark+ [CatStack]', 'info')
+      addLog('│ ▜▄  ██▘▗█▛▝█▛  ▄▐▘           Resolution: 1920x1080 @ 60Hz', 'info')
+      addLog('╰─────────────────────────────────────────────────────╯', 'info')
+    } else if (lower === 'matrix') {
+      addLog('Wake up, Neo...', 'system')
+      addLog('The Matrix has you...', 'system')
+      addLog('Follow the white rabbit.', 'info')
+      const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃ0123456789ABCDEF░▒▓█'
+      const cols = 40
+      for (let row = 0; row < 8; row++) {
+        let line = ''
+        for (let c = 0; c < cols; c++) {
+          line += chars[Math.floor(Math.random() * chars.length)]
+        }
+        addLog(line, 'info')
+      }
+    } else if (lower === 'eject') {
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▛▜▓▓▓▓▓▓▓▓▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▐▌▐▌▓▓▓▓▓▓▓▓▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▛▜▛▜▛▜▛▜▛▜▛▜▐▌▐▌▛▜▓▓▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▐▌            ▐▌▐▌▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▐▌            ▐▌▐▌▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▓▜▖          ▗▛▐▌▐▌▓▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▌▐████████▌▐▌▐████▓▓▓', 'info')
+      addLog('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓', 'info')
+      addLog('[ INFO ] CD-ROM tray ejected. (not really, but you get the idea)', 'success')
     } else if (lower.startsWith('echo ')) {
       addLog(trimmed.slice(5), 'info')
     } else if (lower.startsWith('cat ')) {
@@ -709,21 +743,141 @@ function WindowSettings() {
 }
 
 function WindowFiles() {
+  const [previewFile, setPreviewFile] = useState<VfsNode | null>(null)
   const files: VfsNode[] = VFS['/home/guest'] || []
 
+  const maxSize = Math.max(...files.filter((f) => !f.isDir).map((f) => {
+    const num = parseFloat(f.size) || 0
+    const unit = f.size.replace(/[\d.]/g, '') || 'B'
+    return unit === 'K' ? num * 1024 : unit === 'M' ? num * 1024 * 1024 : num
+  }), 1)
+
+  const getSizeBytes = (size: string) => {
+    const num = parseFloat(size) || 0
+    const unit = size.replace(/[\d.]/g, '') || 'B'
+    return unit === 'K' ? num * 1024 : unit === 'M' ? num * 1024 * 1024 : num
+  }
+
+  const barWidth = (size: string) => {
+    return Math.max(4, (getSizeBytes(size) / maxSize) * 120)
+  }
+
   return (
-    <div className="p-2 h-full flex flex-col font-mono text-[11px]">
-      <div className="text-[#569cd6] px-2 py-1 border-b border-[#2d2d2d] mb-1">/home/guest/</div>
-      {files.map((f) => (
-        <div key={f.name} className="flex items-center gap-2 px-2 py-0.5 hover:bg-[#2d2d2d]">
-          <span className={f.isDir ? 'text-[#569cd6]' : 'text-[#cccccc]'}>
-            {f.name}{f.isDir ? '/' : ''}
-          </span>
-          <span className="flex-1" />
-          <span className="text-[#888] text-[10px]">{f.size}</span>
-          <span className="text-[#888] text-[10px]">{f.date}</span>
+    <div className="h-full flex flex-col font-mono text-[11px]">
+      {/* 工具栏 */}
+      <div className="flex items-center gap-2 px-2 py-1 bg-[#252526] border-b border-[#3c3c3c] shrink-0">
+        <span className="text-[#569cd6] text-[10px]">FILE</span>
+        <span className="text-[#888]">|</span>
+        <span className="text-[#dcdcaa] text-[10px]">/home/guest/</span>
+        <span className="flex-1" />
+        <span className="text-[#888] text-[10px]">{files.length} items</span>
+      </div>
+
+      {/* 路径面包屑 */}
+      <div className="flex items-center px-2 py-0.5 bg-[#1e1e1e] border-b border-[#2d2d2d] text-[10px] shrink-0">
+        <span className="text-[#569cd6] cursor-pointer hover:underline">/</span>
+        <span className="text-[#888] mx-0.5">▸</span>
+        <span className="text-[#569cd6] cursor-pointer hover:underline">home</span>
+        <span className="text-[#888] mx-0.5">▸</span>
+        <span className="text-[#cccccc]">guest</span>
+        {Math.random() < 0.05 && (
+          <span className="ml-2 text-[#ff69b4] text-[9px] animate-pulse">🐱 ~(=^･ω･^=)</span>
+        )}
+      </div>
+
+      {/* 列头 */}
+      <div className="flex items-center px-2 py-0.5 bg-[#1e1e1e] border-b border-[#2d2d2d] text-[10px] text-[#888] shrink-0">
+        <span className="w-5 shrink-0"></span>
+        <span className="flex-1 uppercase tracking-wider">Name</span>
+        <span className="w-[60px] text-right uppercase tracking-wider">Size</span>
+        <span className="w-[80px] text-right uppercase tracking-wider">Bar</span>
+        <span className="w-[80px] text-right uppercase tracking-wider">Date</span>
+      </div>
+
+      {/* 文件列表 */}
+      <div className="flex-1 overflow-auto">
+        {files.map((f) => (
+          <div
+            key={f.name}
+            className="flex items-center px-2 py-[3px] hover:bg-[#2d2d2d] cursor-pointer transition-colors group"
+            onClick={() => !f.isDir && setPreviewFile(previewFile?.name === f.name ? null : f)}
+          >
+            {/* 图标 */}
+            <span className="w-5 shrink-0 text-center text-[12px]">
+              {f.isDir ? (
+                <span className="text-[#569cd6]">📁</span>
+              ) : f.name.endsWith('.md') ? (
+                <span>📝</span>
+              ) : f.name.endsWith('.sh') ? (
+                <span>⚡</span>
+              ) : f.name.endsWith('.yaml') || f.name.endsWith('.yml') ? (
+                <span>⚙️</span>
+              ) : f.name.endsWith('.log') ? (
+                <span>📋</span>
+              ) : f.name.startsWith('.') ? (
+                <span>🔧</span>
+              ) : (
+                <span>📄</span>
+              )}
+            </span>
+
+            {/* 文件名 */}
+            <span className={`flex-1 truncate group-hover:underline ${
+              f.isDir ? 'text-[#569cd6]' : 'text-[#cccccc]'
+            }`}>
+              {f.name}{f.isDir ? '/' : ''}
+            </span>
+
+            {/* 大小 */}
+            <span className="w-[60px] text-right text-[#888]">{f.size}</span>
+
+            {/* 大小进度条 */}
+            <span className="w-[80px] text-right shrink-0">
+              {!f.isDir && (
+                <span className="inline-block bg-[#264f78] h-2 rounded-sm" style={{ width: `${barWidth(f.size)}px` }} />
+              )}
+              {f.isDir && <span className="text-[#888]">{"<DIR>"}</span>}
+            </span>
+
+            {/* 日期 */}
+            <span className="w-[80px] text-right text-[#888] text-[10px]">{f.date}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 预览面板 */}
+      {previewFile && (
+        <div className="shrink-0 border-t border-[#3c3c3c] bg-[#252526] p-2 max-h-[120px] overflow-auto">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[#569cd6] text-[10px]">📄 PREVIEW</span>
+            <span className="text-[#dcdcaa] text-[10px]">{previewFile.name}</span>
+            <span className="flex-1" />
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="text-[#888] hover:text-[#f44747] text-[10px]"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="font-mono text-[10px] text-[#cccccc] whitespace-pre-wrap opacity-80">
+            {previewFile.content || '(empty)'}
+          </div>
         </div>
-      ))}
+      )}
+
+      {/* 彩蛋：底部状态条随机信息 */}
+      <div className="shrink-0 bg-[#007acc] h-[18px] flex items-center px-2">
+        <span className="text-[9px] text-white/60 font-mono">
+          {[
+            '一切正常 | All systems nominal',
+            '肚子饿了喵 ~',
+            `uptime: ${Math.floor(Math.random() * 999)}d`,
+            '🔒 RLS active',
+            '📡 Realtime connected',
+            '🧶 chasing yarn balls...',
+          ][Math.floor(Math.random() * 6)]}
+        </span>
+      </div>
     </div>
   )
 }
