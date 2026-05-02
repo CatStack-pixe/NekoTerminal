@@ -22,6 +22,7 @@ export default function HomePage() {
   const queryClient = useQueryClient()
   const { append: terminalLog } = useTerminalLogs()
 
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [traceMode, setTraceMode] = useState(false)
@@ -177,19 +178,25 @@ export default function HomePage() {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文件资源管理器风格侧边栏 */}
         <Sidebar
-          isOpen={true}
+          isOpen={sidebarOpen}
           conversations={conversations ?? []}
           activeId={activeConversationId ?? undefined}
-          onSelectConversation={(conv) => setActiveConversationId(conv.id)}
+          onSelectConversation={(conv) => {
+            setActiveConversationId(conv.id)
+            // 移动端选择后自动关闭侧边栏
+            if (window.innerWidth < 1024) setSidebarOpen(false)
+          }}
           onDeleteConversation={(conv) => deleteConversation.mutate(conv.id)}
           onNewConversation={handleNewChat}
+          onClose={() => setSidebarOpen(false)}
+          onOpen={() => setSidebarOpen(true)}
         />
 
         {/* 聊天主面板 */}
         <div className="flex-1 flex flex-col min-w-0">
           <ChatHeader
             title={activeConversation?.title ?? 'SELECT TRANSMISSION'}
-            onToggleSidebar={() => {}}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             onOpenConfig={() => setConfigOpen(true)}
             onSignOut={signOut}
           />
