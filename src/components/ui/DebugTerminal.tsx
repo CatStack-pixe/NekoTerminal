@@ -136,6 +136,7 @@ export function DebugTerminal({
   const [input, setInput] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
   const [bannerShown, setBannerShown] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -275,10 +276,18 @@ export function DebugTerminal({
   }, [])
 
   return (
-    <div className="border-t border-terminal-border bg-black/60 flex flex-col h-48 select-none">
-      {/* 终端头部 — 标签 + 滚动锁定指示 */}
-      <div className="flex items-center justify-between px-3 py-1 bg-[#252526] border-b border-terminal-border">
+    <div className={cn("border-t border-terminal-border bg-black/60 flex flex-col select-none transition-all duration-200", collapsed ? 'h-8' : 'h-48')}>
+      {/* 终端头部 — 标签 + 操作按钮 */}
+      <div className="flex items-center justify-between px-3 py-1 bg-[#252526] border-b border-terminal-border shrink-0">
         <div className="flex items-center gap-2">
+          {/* 折叠/展开按钮 */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="text-[10px] text-terminal-dim hover:text-terminal-primary font-mono transition-colors mr-1"
+            title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
+          >
+            {collapsed ? '▶' : '▼'}
+          </button>
           <span className="text-[10px] text-terminal-dim font-mono tracking-wider uppercase">
             TERMINAL
           </span>
@@ -309,43 +318,48 @@ export function DebugTerminal({
         </div>
       </div>
 
-      {/* 日志区域 */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        onClick={focusInput}
-        className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-xs leading-snug"
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        {logs.length === 0 && (
-          <div className="flex items-center justify-center h-full text-terminal-dim/30 text-xs font-mono">
-            {'>>> '}_ TERMINAL READY — TYPE /help FOR COMMANDS
+      {/* 展开区域：日志 + 输入 */}
+      {!collapsed && (
+        <>
+          {/* 日志区域 */}
+          <div
+            ref={containerRef}
+            onScroll={handleScroll}
+            onClick={focusInput}
+            className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-xs leading-snug"
+            style={{ scrollBehavior: 'smooth' }}
+          >
+            {logs.length === 0 && (
+              <div className="flex items-center justify-center h-full text-terminal-dim/30 text-xs font-mono">
+                {'>>> '}_ TERMINAL READY — TYPE /help FOR COMMANDS
+              </div>
+            )}
+            {logs.map((entry) => (
+              <TerminalLogLine key={entry.id} entry={entry} />
+            ))}
+            <div ref={bottomRef} />
           </div>
-        )}
-        {logs.map((entry) => (
-          <TerminalLogLine key={entry.id} entry={entry} />
-        ))}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* 命令行输入 */}
-      <div className="flex items-center gap-1.5 px-2 py-1 border-t border-terminal-border/50 bg-[#1e1e1e]">
-        <span className="text-terminal-primary text-xs font-mono shrink-0">$</span>
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="type /help for commands..."
-          className="flex-1 bg-transparent border-none outline-none font-mono text-xs text-terminal-text placeholder:text-terminal-dim/30 py-0.5"
-          spellCheck={false}
-          autoComplete="off"
-        />
-        <span className="text-terminal-primary/40 text-xs font-mono animate-pulse shrink-0">
-          ▊
-        </span>
-      </div>
+          {/* 命令行输入 */}
+          <div className="flex items-center gap-1.5 px-2 py-1 border-t border-terminal-border/50 bg-[#1e1e1e]">
+            <span className="text-terminal-primary text-xs font-mono shrink-0">$</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="type /help for commands..."
+              className="flex-1 bg-transparent border-none outline-none font-mono text-xs text-terminal-text placeholder:text-terminal-dim/30 py-0.5"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <span className="text-terminal-primary/40 text-xs font-mono animate-pulse shrink-0">
+              ▊
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
