@@ -11,6 +11,9 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signInWithEmail: (email: string) => Promise<{ error?: string }>
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string) => Promise<{ error?: string; success?: string }>
+  updatePassword: (newPassword: string) => Promise<{ error?: string; success?: string }>
   verifyOtp: (email: string, token: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -67,6 +70,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {}
   }
 
+  // 密码登录
+  const signInWithPassword = async (email: string, password: string) => {
+    if (!supabase) return { error: 'Supabase 未配置' }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+    return {}
+  }
+
+  // 注册
+  const signUp = async (email: string, password: string) => {
+    if (!supabase) return { error: 'Supabase 未配置' }
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) return { error: error.message }
+    if (data.user && !data.session) {
+      return { success: '注册成功！请检查邮箱确认链接。' }
+    }
+    return { success: '注册成功！已自动登录。' }
+  }
+
+  // 修改密码
+  const updatePassword = async (newPassword: string) => {
+    if (!supabase) return { error: 'Supabase 未配置' }
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return { error: error.message }
+    return { success: '密码已更新' }
+  }
+
   // OTP 验证已废弃 —— 改用 Magic Link 回调流程
   const verifyOtp = async (_email: string, _token: string) => {
     return { error: 'OTP 已弃用，请使用 Magic Link 登录' }
@@ -87,6 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         signInWithEmail,
+        signInWithPassword,
+        signUp,
+        updatePassword,
         verifyOtp,
         signOut,
       }}

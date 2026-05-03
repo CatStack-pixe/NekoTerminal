@@ -15,7 +15,7 @@ import { useMessages } from '@/hooks/useMessages'
 import { useChatStream } from '@/hooks/useChatStream'
 import { useTerminalLogs } from '@/lib/terminal-log-context'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Conversation, Message } from '@/types'
+import type { Conversation, Message, ProviderConfig } from '@/types'
 
 export default function HomePage() {
   const { user, loading: authLoading, signOut } = useAuth()
@@ -88,6 +88,8 @@ export default function HomePage() {
       setPendingUserContent(content)
       setStreamPhase('connecting')
 
+      let providerUsed: { providerIndex: number; keyIndex: number } | null = null
+
       if (convId) {
         const currentConv = conversations?.find((c: Conversation) => c.id === convId)
         if (!currentConv) {
@@ -95,11 +97,29 @@ export default function HomePage() {
           setStreamPhase('idle')
           return
         }
-        apiUrl = currentConv.api_url
-        apiKey = currentConv.api_key ?? ''
-        model = currentConv.model
+
+        // 优先使用 provider_configs（多厂商模式）
+        const providers = currentConv.provider_configs
+        if (providers && providers.length > 0) {
+          const activeIdx = 0 // 使用第一个厂商作为活跃
+          const provider = providers[activeIdx]
+          apiUrl = provider.apiUrl || currentConv.api_url
+          const ki = provider.keyIndex ?? 0
+          apiKey = provider.apiKeys[ki] ?? currentConv.api_key ?? ''
+          model = provider.models?.[0] ?? currentConv.model
+          providerUsed = { providerIndex: activeIdx, keyIndex: ki }
+          terminalLog({
+            type: 'key',
+            content: `PROVIDER KEY: ${provider.name} Key #${ki + 1}/${provider.apiKeys.length}`,
+            conversationId: convId,
+            meta: { provider: provider.name, keyIndex: ki, totalKeys: provider.apiKeys.length },
+          })
+        } else {
+          apiUrl = currentConv.api_url
+          apiKey = currentConv.api_key ?? ''
+          model = currentConv.model
+        }
       } else {
-        // 新建对话，使用 mutateAsync 返回的完整对象
         const title = content.substring(0, 40) + (content.length > 40 ? '…' : '')
         const conv = await createConversation.mutateAsync({ title })
         convId = conv.id
@@ -120,18 +140,34 @@ export default function HomePage() {
           apiKey,
           model,
           onFirstToken: () => {
-            // 首个 token 到达，切换为"正在释放神经递质"
             setStreamPhase('first-token')
           },
         })
-        // 流式完成，等待 DB 刷新后移除乐观消息
+
+        // 成功发送后，轮转 key 索引
+        if (providerUsed && convId) {
+          const currentConv = conversations?.find((c: Conversation) => c.id === convId)
+          if (currentConv?.provider_configs) {
+            const updatedProviders = currentConv.provider_configs.map((p, i) => {
+              if (i === providerUsed!.providerIndex && p.apiKeys.length > 0) {
+                const nextIndex = ((p.keyIndex ?? 0) + 1) % p.apiKeys.length
+                return { ...p, keyIndex: nextIndex }
+              }
+              return p
+            })
+            updateConversation.mutate({
+              id: convId,
+              provider_configs: updatedProviders,
+            })
+          }
+        }
+
         setPendingUserContent(null)
         setStreamPhase('idle')
         setStreamError(null)
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
         terminalLog({ type: 'error', content: `SEND FAILED: ${errMsg}`, conversationId: convId })
-        // 错误时：保留乐观用户消息，显示错误
         setStreamPhase('idle')
         setStreamError(errMsg)
       }
@@ -155,7 +191,7 @@ export default function HomePage() {
 
   // 保存配置
   const handleConfigSave = useCallback(
-    (data: { title: string; model: string; apiUrl: string; apiKey: string; systemPrompt: string }) => {
+    (data: { title: string; model: string; apiUrl: string; apiKey: string; systemPrompt: string; providerConfigs?: ProviderConfig[] | null }) => {
       if (!activeConversationId) return
       updateConversation.mutate({
         id: activeConversationId,
@@ -164,8 +200,10 @@ export default function HomePage() {
         api_url: data.apiUrl,
         api_key: data.apiKey,
         system_prompt: data.systemPrompt,
+        provider_configs: data.providerConfigs ?? null,
       })
-      terminalLog({ type: 'info', content: `CONFIG SAVED: ${data.title} / ${data.model}`, conversationId: activeConversationId })
+      const providerCount = data.providerConfigs?.length ?? 0
+      terminalLog({ type: 'info', content: `CONFIG SAVED: ${data.model}${providerCount > 0 ? ` | ${providerCount} providers` : ''}`, conversationId: activeConversationId })
     },
     [activeConversationId, updateConversation, terminalLog]
   )

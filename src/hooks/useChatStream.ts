@@ -63,7 +63,7 @@ export function useChatStream() {
       // 🔌 网络日志: 请求发起
       terminalLog({
         type: 'network',
-        content: `🔌 CONNECT → ${apiUrl}`,
+        content: `CONNECT → ${apiUrl}`,
         conversationId,
         meta: { model, messageCount: messages.length, timestamp: Date.now() },
       })
@@ -87,7 +87,7 @@ export function useChatStream() {
       const networkTime = (performance.now() - startTime).toFixed(0)
       terminalLog({
         type: 'network',
-        content: `📡 RESPONSE ${response.status} (${networkTime}ms)`,
+        content: `RESPONSE ${response.status} (${networkTime}ms)`,
         conversationId,
         meta: { status: response.status, timing: `${networkTime}ms` },
       })
@@ -96,7 +96,7 @@ export function useChatStream() {
         const errorBody = await response.text()
         terminalLog({
           type: 'error',
-          content: `❌ HTTP ERROR ${response.status}: ${errorBody.slice(0, 200)}`,
+          content: `HTTP ERROR ${response.status}: ${errorBody.slice(0, 200)}`,
           conversationId,
           meta: { status: response.status, body: errorBody },
         })
@@ -127,7 +127,7 @@ export function useChatStream() {
         if (chunkCount % 5 === 0) {
           terminalLog({
             type: 'network',
-            content: `📥 CHUNK #${chunkCount} (${totalBytes} bytes, +${chunkInterval}ms)`,
+            content: `CHUNK #${chunkCount} (${totalBytes} bytes, +${chunkInterval}ms)`,
             conversationId,
             meta: { bytes: totalBytes, chunks: chunkCount, interval: `${chunkInterval}ms` },
           })
@@ -181,7 +181,7 @@ export function useChatStream() {
       // ⏱ 性能总结
       terminalLog({
         type: 'perf',
-        content: `✅ STREAM COMPLETE — ${tokCount} chars in ${streamDuration}s (${tokPerSec} char/s), ${totalBytes} bytes, ${chunkCount} chunks`,
+        content: `STREAM COMPLETE — ${tokCount} chars in ${streamDuration}s (${tokPerSec} char/s), ${totalBytes} bytes, ${chunkCount} chunks`,
         conversationId,
         meta: {
           totalChars: tokCount,
@@ -197,7 +197,7 @@ export function useChatStream() {
       // 💾 DB 写入日志 (服务端已写入，此处做标记)
       terminalLog({
         type: 'db',
-        content: `💾 DB WRITE: AI response saved (${tokCount} chars)`,
+        content: `DB WRITE: AI response saved (${tokCount} chars)`,
         conversationId,
         meta: { charCount: tokCount, bytes: totalBytes },
       })
@@ -215,7 +215,7 @@ export function useChatStream() {
       onFirstTokenRef.current = null
       terminalLog({
         type: 'error',
-        content: `❌ STREAM ABORTED: ${error instanceof Error ? error.message : String(error)}`,
+        content: `STREAM ABORTED: ${error instanceof Error ? error.message : String(error)}`,
         meta: { error: error instanceof Error ? error.message : String(error) },
       })
     },

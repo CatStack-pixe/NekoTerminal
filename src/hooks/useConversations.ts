@@ -70,6 +70,7 @@ export function useConversations() {
           api_url: payload.api_url,
           api_key: payload.api_key,
           system_prompt: payload.system_prompt,
+          provider_configs: payload.provider_configs,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

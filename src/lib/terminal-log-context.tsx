@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react'
 
-export type TerminalLogType = 'system' | 'user' | 'ai' | 'error' | 'info' | 'token' | 'network' | 'db' | 'perf' | 'warn' | 'debug'
+export type TerminalLogType = 'system' | 'user' | 'ai' | 'error' | 'info' | 'token' | 'network' | 'db' | 'perf' | 'warn' | 'debug' | 'key'
 
 export interface TerminalLogEntry {
   id: number

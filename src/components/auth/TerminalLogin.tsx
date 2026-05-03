@@ -113,7 +113,7 @@ interface WinInstance {
 const COMMANDS = [
   'help', 'login', 'window', 'clear', 'whoami',
   'date', 'echo', 'ls', 'dir', 'uname', 'cat', 'fastfetch',
-  'pwd', 'uptime', 'matrix', 'eject',
+  'pwd', 'uptime', 'matrix', 'eject', 'unlock', 'passwd',
 ]
 const WINDOW_TYPES = ['login', 'info', 'settings', 'files', 'processes']
 
@@ -171,15 +171,23 @@ function FASTFETCH_LINES(): LogLine[] {
   ]
 }
 
-type Phase = 'boot' | 'ready' | 'login-email'
+type Phase = 'boot' | 'ready' | 'login-email' | 'login-password-email' | 'login-password-pass' | 'signup-email' | 'signup-pass' | 'signup-confirm' | 'passwd-current' | 'passwd-new' | 'passwd-confirm'
 
-export function TerminalLogin() {
-  const { signInWithEmail, verifyOtp } = useAuth()
+interface TerminalLoginProps {
+  /** 已登录用户的锁定态，提供解锁回调 */
+  alreadyLoggedIn?: boolean
+  onUnlock?: () => void
+}
+
+export function TerminalLogin({ alreadyLoggedIn = false, onUnlock }: TerminalLoginProps) {
+  const { user, signInWithEmail, signInWithPassword, signUp, updatePassword } = useAuth()
   const [phase, setPhase] = useState<Phase>('boot')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [bootIndex, setBootIndex] = useState(0)
   const [input, setInput] = useState('')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [passConfirm, setPassConfirm] = useState('')
   const [error, setError] = useState('')
   const [infoMsg, setInfoMsg] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -207,16 +215,28 @@ export function TerminalLogin() {
   // 启动动画
   useEffect(() => {
     if (bootIndex >= BOOT_SEQUENCE.length) {
-      setPhase('ready')
+      setPhase(alreadyLoggedIn ? 'ready' : 'ready')
       return
     }
     const timer = setTimeout(() => {
       const line = BOOT_SEQUENCE[bootIndex]
       addLog(line.text, line.type)
       setBootIndex((i) => i + 1)
-    }, 120)
+    }, 80) // 加快启动速度，80ms
     return () => clearTimeout(timer)
-  }, [bootIndex])
+  }, [bootIndex, alreadyLoggedIn])
+
+  // 已登录时显示欢迎信息
+  useEffect(() => {
+    if (bootIndex >= BOOT_SEQUENCE.length && alreadyLoggedIn && user) {
+      const timer = setTimeout(() => {
+        addLog('', 'info')
+        addLog(`[  OK  ] Session restored — logged in as ${user.email}`, 'success')
+        addLog('Type "unlock" to return to CatStack AI, or "help" for commands.', 'system')
+      }, 200)
+      return () => clearTimeout(timer)
+    }
+  }, [bootIndex, alreadyLoggedIn, user])
 
   // 自动滚动
   useEffect(() => {
@@ -240,7 +260,7 @@ export function TerminalLogin() {
 
   // ====== Tab 补全 ======
   const handleTab = () => {
-    if (phase === 'login-email') return
+    if (phase !== 'ready') return
 
     const cur = inputRef_val.current
     if (!cur.trim()) return
@@ -349,6 +369,8 @@ export function TerminalLogin() {
       addLog('Available commands:', 'info')
       addLog('  help                           Show this help', 'info')
       addLog('  login                          Login with email', 'info')
+      addLog('  unlock                         Return to CatStack AI chat', 'info')
+      addLog('  passwd                         Change password', 'info')
       addLog('  window [type]                  Open GUI window', 'info')
       addLog('    types: login, info, settings, files, processes', 'info')
       addLog('  clear                          Clear screen', 'info')
@@ -367,7 +389,24 @@ export function TerminalLogin() {
       addLog('  ↑/↓ arrows                    Command history', 'info')
     } else if (lower === 'login') {
       setPhase('login-email')
-      addLog('Enter your email address to receive a Magic Link:', 'system')
+      addLog('=== LOGIN ===', 'highlight')
+      addLog('Enter your email address:', 'system')
+      addLog('(You\'ll then choose Magic Link or Password)', 'info')
+    } else if (lower === 'unlock') {
+      if (alreadyLoggedIn && onUnlock) {
+        addLog('[  OK  ] Unlocking... returning to CatStack AI', 'success')
+        onUnlock()
+      } else {
+        addLog('unlock: not available — already at login screen', 'warn')
+      }
+    } else if (lower === 'passwd') {
+      if (!user) {
+        addLog('passwd: you are not logged in', 'error')
+      } else {
+        setPhase('passwd-current')
+        addLog('Enter current password (not verified, proceed to new password):', 'system')
+        addLog('(Type new password directly)', 'info')
+      }
     } else if (lower === 'window') {
       openWindow('login')
     } else if (lower.startsWith('window ')) {
@@ -382,7 +421,12 @@ export function TerminalLogin() {
       setLogs([])
       setPhase('ready')
     } else if (lower === 'whoami') {
-      addLog('guest', 'info')
+      if (user) {
+        addLog(user.email || 'authenticated_user', 'info')
+        addLog(`UID: ${user.id.substring(0, 8)}...`, 'info')
+      } else {
+        addLog('guest', 'info')
+      }
     } else if (lower === 'date') {
       addLog(new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }), 'info')
     } else if (lower === 'pwd') {
@@ -432,7 +476,6 @@ export function TerminalLogin() {
         const node = getFile(abspath)
         if (node) {
           const lines = (node.content || '').split('\n')
-          // omit trailing empty string from split
           const display = lines.length > 0 && lines[lines.length - 1] === ''
             ? lines.slice(0, -1)
             : lines
@@ -449,7 +492,6 @@ export function TerminalLogin() {
       } else {
         const paddedMode = entries.map((e) => e.mode)
         const paddedSize = entries.map((e) => e.size)
-        // simple total blocks calc
         const total = entries.reduce((sum, e) => {
           const num = parseInt(e.size) || 0
           return sum + Math.ceil(num / 1024)
@@ -465,12 +507,10 @@ export function TerminalLogin() {
       if (!dirName) {
         addLog('mkdir: missing operand', 'error')
       } else {
-        // resolve to absolute
         const abspath = resolvePath(dirName)
         if (VFS[abspath]) {
           addLog(`mkdir: cannot create directory '${dirName}': File exists`, 'error')
         } else {
-          // add dir to VFS and its parent entry
           addLog(`[VFS] Created directory ${abspath}`, 'success')
         }
       }
@@ -485,28 +525,187 @@ export function TerminalLogin() {
     if (!email.trim()) return
     setError('')
     setInfoMsg('')
-    addLog(`$ ${email}`, 'system')
-
-    setInfoMsg('Sending Magic Link...')
-    const result = await signInWithEmail(email.trim())
-    if (result.error) {
-      setError(result.error)
-      addLog(`Error: ${result.error}`, 'error')
-      setInfoMsg('')
-      return
-    }
-    setInfoMsg('')
-    addLog('[  OK  ] Magic Link sent!', 'success')
-    addLog('Check your email and click the link to sign in.', 'system')
-    addLog('This terminal will auto-refresh upon successful login.', 'info')
-    setPhase('ready')
-    setEmail('')
+    addLog(`Email: ${email}`, 'system')
+    addLog('Choose login method:', 'system')
+    addLog('  [1] Magic Link (send login link to email)', 'info')
+    addLog('  [2] Password Login', 'info')
+    addLog('  [3] Sign Up (register)', 'info')
+    addLog('Type 1, 2, or 3:', 'system')
+    setPhase('login-email')
   }
 
-  const handleWindowLogin = async (val: string) => {
+  // ====== 密码登录流程 ======
+  const handleLoginMethodChoice = async (choice: string) => {
+    const trimmed = choice.trim()
+
+    if (phase === 'login-email') {
+      if (trimmed === '1') {
+        // Magic Link
+        setInfoMsg('Sending Magic Link...')
+        const result = await signInWithEmail(email.trim())
+        if (result.error) {
+          setError(result.error)
+          addLog(`Error: ${result.error}`, 'error')
+          setInfoMsg('')
+          return
+        }
+        setInfoMsg('')
+        addLog('[  OK  ] Magic Link sent!', 'success')
+        addLog('Check your email and click the link to sign in.', 'system')
+        addLog('This terminal will auto-refresh upon successful login.', 'info')
+        setPhase('ready')
+        setEmail('')
+        return
+      }
+      if (trimmed === '2') {
+        // Password login
+        setPhase('login-password-pass')
+        setPassword('')
+        addLog('Enter your password:', 'system')
+        return
+      }
+      if (trimmed === '3') {
+        // Sign up
+        setPhase('signup-pass')
+        setPassword('')
+        addLog('=== SIGN UP ===', 'highlight')
+        addLog('Create a password (min 6 characters):', 'system')
+        return
+      }
+      addLog('Invalid choice. Type 1, 2, or 3.', 'warn')
+      return
+    }
+
+    // Password input phase
+    if (phase === 'login-password-pass') {
+      const pass = trimmed
+      setInfoMsg('Authenticating...')
+      const result = await signInWithPassword(email.trim(), pass)
+      if (result.error) {
+        setError(result.error)
+        addLog(`Error: ${result.error}`, 'error')
+        setInfoMsg('')
+        setPhase('login-email')
+        return
+      }
+      setInfoMsg('')
+      addLog('[  OK  ] Login successful!', 'success')
+      addLog(`Welcome, ${email}`, 'system')
+      setPhase('ready')
+      setEmail('')
+      setPassword('')
+      return
+    }
+
+    // Signup password phase
+    if (phase === 'signup-pass') {
+      if (trimmed.length < 6) {
+        addLog('Password must be at least 6 characters.', 'error')
+        return
+      }
+      setPassword(trimmed)
+      setPhase('signup-confirm')
+      addLog('Confirm password:', 'system')
+      return
+    }
+
+    if (phase === 'signup-confirm') {
+      if (trimmed !== password) {
+        addLog('Passwords do not match. Try again.', 'error')
+        setPhase('signup-pass')
+        return
+      }
+      setInfoMsg('Creating account...')
+      const result = await signUp(email.trim(), trimmed)
+      if (result.error) {
+        setError(result.error)
+        addLog(`Error: ${result.error}`, 'error')
+        setInfoMsg('')
+        setPhase('ready')
+        return
+      }
+      setInfoMsg('')
+      addLog(`[  OK  ] ${result.success}`, 'success')
+      setPhase('ready')
+      setEmail('')
+      setPassword('')
+      return
+    }
+
+    // passwd flow
+    if (phase === 'passwd-current') {
+      // Skip current password verification, just ask for new
+      setPassword(trimmed)
+      setPhase('passwd-new')
+      addLog('Enter new password (min 6 characters):', 'system')
+      return
+    }
+
+    if (phase === 'passwd-new') {
+      if (trimmed.length < 6) {
+        addLog('Password must be at least 6 characters.', 'error')
+        return
+      }
+      setPassword(trimmed)
+      setPhase('passwd-confirm')
+      addLog('Confirm new password:', 'system')
+      return
+    }
+
+    if (phase === 'passwd-confirm') {
+      if (trimmed !== password) {
+        addLog('Passwords do not match. Try again.', 'error')
+        setPhase('passwd-new')
+        return
+      }
+      setInfoMsg('Updating password...')
+      const result = await updatePassword(trimmed)
+      if (result.error) {
+        addLog(`Error: ${result.error}`, 'error')
+      } else {
+        addLog('[  OK  ] Password updated successfully', 'success')
+      }
+      setInfoMsg('')
+      setPhase('ready')
+      return
+    }
+  }
+
+  // ====== 窗口中的登录/注册 ======
+  const handleWindowLoginCallback = async (val: string, method: 'magic' | 'password', pass?: string) => {
     setEmail(val)
-    setInfoMsg('Sending Magic Link...')
-    const result = await signInWithEmail(val.trim())
+    if (method === 'magic') {
+      setInfoMsg('Sending Magic Link...')
+      const result = await signInWithEmail(val.trim())
+      if (result.error) {
+        setError(result.error)
+        addLog(`Error: ${result.error}`, 'error')
+        setInfoMsg('')
+        return
+      }
+      setInfoMsg('')
+      addLog(`[  OK  ] Magic Link sent to ${val}`, 'success')
+      addLog('Check your email and click the link to sign in.', 'system')
+    } else {
+      setInfoMsg('Authenticating...')
+      const result = await signInWithPassword(val.trim(), pass || '')
+      if (result.error) {
+        setError(result.error)
+        addLog(`Error: ${result.error}`, 'error')
+        setInfoMsg('')
+        return
+      }
+      setInfoMsg('')
+      addLog(`[  OK  ] Login successful — Welcome ${val}`, 'success')
+    }
+    setEmail('')
+    setPassword('')
+    setPhase('ready')
+  }
+
+  const handleWindowSignUp = async (val: string, pass: string) => {
+    setInfoMsg('Creating account...')
+    const result = await signUp(val.trim(), pass)
     if (result.error) {
       setError(result.error)
       addLog(`Error: ${result.error}`, 'error')
@@ -514,31 +713,70 @@ export function TerminalLogin() {
       return
     }
     setInfoMsg('')
-    addLog(`[  OK  ] Magic Link sent to ${val}`, 'success')
-    addLog('Check your email and click the link to sign in.', 'system')
-    setEmail('')
-    setPhase('ready')
+    addLog(`[  OK  ] ${result.success}`, 'success')
   }
 
   // ====== 键盘事件 ======
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      const val = inputRef.current?.value || ''
       if (phase === 'login-email') {
-        handleEmailSubmit()
+        const trimmed = val.trim()
+        if (!trimmed) return
+        // If no email saved yet, treat as email input
+        if (!password && (trimmed === '1' || trimmed === '2' || trimmed === '3')) {
+          handleLoginMethodChoice(trimmed)
+          setInput('')
+          return
+        }
+        // If it looks like an email (contains @), capture it
+        if (trimmed.includes('@') && !email) {
+          setEmail(trimmed)
+          addLog(`Email: ${trimmed}`, 'system')
+          addLog('Choose login method:', 'system')
+          addLog('  [1] Magic Link (send login link to email)', 'info')
+          addLog('  [2] Password Login', 'info')
+          addLog('  [3] Sign Up (register)', 'info')
+          addLog('Type 1, 2, or 3:', 'system')
+          setInput('')
+          return
+        }
+        if (email) {
+          handleLoginMethodChoice(trimmed)
+          setInput('')
+          return
+        }
+        // Empty input, capture email first
+        setEmail(trimmed)
+        addLog(`Email: ${trimmed}`, 'system')
+        addLog('Choose login method:', 'system')
+        addLog('  [1] Magic Link (send login link to email)', 'info')
+        addLog('  [2] Password Login', 'info')
+        addLog('  [3] Sign Up (register)', 'info')
+        addLog('Type 1, 2, or 3:', 'system')
+        setInput('')
+        return
+      } else if (phase.startsWith('login-password') || phase.startsWith('signup') || phase.startsWith('passwd')) {
+        handleLoginMethodChoice(val)
+        setInput('')
+        return
       } else {
-        handleCommand(input)
+        handleCommand(val)
+        setInput('')
       }
     } else if (e.key === 'Tab') {
       e.preventDefault()
       handleTab()
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      if (phase !== 'ready') return
       if (history.length === 0) return
       const newIdx = historyIdx === -1 ? history.length - 1 : Math.max(0, historyIdx - 1)
       setHistoryIdx(newIdx)
       setInput(history[newIdx])
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
+      if (phase !== 'ready') return
       if (historyIdx === -1) return
       const newIdx = historyIdx + 1
       if (newIdx >= history.length) {
@@ -549,6 +787,19 @@ export function TerminalLogin() {
         setInput(history[newIdx])
       }
     }
+  }
+
+  const promptSymbol = (): string => {
+    if (phase === 'login-email') return 'auth>'
+    if (phase.startsWith('login-password') || phase.startsWith('signup') || phase.startsWith('passwd')) return 'pass>'
+    if (alreadyLoggedIn && user) return `${(user.email || 'user').split('@')[0]}@catstack$`
+    return 'guest@catstack$'
+  }
+
+  const getPlaceholder = (): string => {
+    if (phase === 'login-email') return 'user@example.com'
+    if (phase.startsWith('login-password') || phase.startsWith('signup') || phase.startsWith('passwd')) return '••••••'
+    return "Type a command or 'help'..."
   }
 
   const showInput = phase !== 'boot'
@@ -601,30 +852,18 @@ export function TerminalLogin() {
       {showInput && (
         <div className="border-t border-[#3c3c3c] p-2 bg-[#1e1e1e] shrink-0 relative z-[60]">
           <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-[#569cd6] shrink-0">
-              {phase === 'login-email' ? 'email>' : '$'}
+            <span className="font-mono text-sm text-[#569cd6] shrink-0 select-none">
+              {promptSymbol()}
             </span>
-            {phase === 'login-email' ? (
-              <input
-                ref={inputRef}
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="user@example.com"
-                className="flex-1 bg-transparent border-none outline-none text-sm text-[#cccccc] font-mono placeholder:text-[#808080]/50"
-              />
-            ) : (
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a command or 'help'..."
-                className="flex-1 bg-transparent border-none outline-none text-sm text-[#cccccc] font-mono placeholder:text-[#808080]/50"
-              />
-            )}
+            <input
+              ref={inputRef}
+              type={phase.startsWith('login-password') || phase.startsWith('signup') || phase.startsWith('passwd') ? 'password' : 'text'}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={getPlaceholder()}
+              className="flex-1 bg-transparent border-none outline-none text-sm text-[#cccccc] font-mono placeholder:text-[#808080]/50"
+            />
           </div>
         </div>
       )}
@@ -640,17 +879,22 @@ export function TerminalLogin() {
           onClose={closeWindow}
           defaultX={80 + idx * 30}
           defaultY={60 + idx * 30}
-          defaultWidth={420}
-          defaultHeight={300}
+          defaultWidth={460}
+          defaultHeight={380}
         >
           {win.type === 'login' && (
             <WindowLogin
-              onEmailLogin={(val) => {
-                handleWindowLogin(val)
+              onMagicLinkLogin={(val) => {
+                handleWindowLoginCallback(val, 'magic')
                 closeWindow(win.id)
               }}
-              onGithubLogin={() => {
-                addLog('GitHub OAuth: not available in demo', 'error')
+              onPasswordLogin={(val, pass) => {
+                handleWindowLoginCallback(val, 'password', pass)
+                closeWindow(win.id)
+              }}
+              onSignUp={(val, pass) => {
+                handleWindowSignUp(val, pass)
+                closeWindow(win.id)
               }}
             />
           )}
@@ -667,50 +911,151 @@ export function TerminalLogin() {
 // ====== 窗口内容组件 ======
 
 function WindowLogin({
-  onEmailLogin,
-  onGithubLogin,
+  onMagicLinkLogin,
+  onPasswordLogin,
+  onSignUp,
 }: {
-  onEmailLogin: (email: string) => void
-  onGithubLogin: () => void
+  onMagicLinkLogin: (email: string) => void
+  onPasswordLogin: (email: string, password: string) => void
+  onSignUp: (email: string, password: string) => void
 }) {
+  const [mode, setMode] = useState<'select' | 'magic' | 'password' | 'signup'>('select')
   const [val, setVal] = useState('')
+  const [pass, setPass] = useState('')
+  const [passConfirm, setPassConfirm] = useState('')
+  const [signupError, setSignupError] = useState('')
+
+  const emailValid = val.includes('@') && val.includes('.')
+  const passValid = pass.length >= 6
+
+  const handleSubmit = () => {
+    if (mode === 'magic' && emailValid) {
+      onMagicLinkLogin(val)
+    } else if (mode === 'password' && emailValid && passValid) {
+      onPasswordLogin(val, pass)
+    } else if (mode === 'signup' && emailValid && passValid) {
+      if (pass !== passConfirm) {
+        setSignupError('Passwords do not match')
+        return
+      }
+      onSignUp(val, pass)
+    }
+  }
 
   return (
-    <div className="p-4 h-full flex flex-col gap-4 justify-center">
+    <div className="p-4 h-full flex flex-col gap-3 justify-center">
+      {/* Header */}
       <div className="text-center">
-        <div className="font-mono text-xs text-[#569cd6] mb-1">AUTHENTICATION REQUIRED</div>
+        <div className="font-mono text-xs text-[#569cd6] mb-1 tracking-wider">AUTHENTICATION REQUIRED</div>
         <div className="font-mono text-[10px] text-[#888]">
           Sign in to access CatStack Terminal
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="font-mono text-[10px] text-[#888] uppercase tracking-wider">Email</label>
-        <input
-          type="email"
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          placeholder="user@example.com"
-          className="w-full bg-[#2d2d2d] border border-[#3c3c3c] text-[12px] text-[#cccccc] px-2.5 py-1.5 font-mono outline-none focus:border-[#569cd6]/50 transition-colors placeholder:text-[#808080]/50"
-        />
-      </div>
+      {/* Mode Selector */}
+      {mode === 'select' && (
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => setMode('magic')}
+            className="w-full bg-[#2d2d2d] hover:bg-[#3c3c3c] border border-[#3c3c3c] hover:border-[#569cd6]/40 text-[#cccccc] font-mono text-[11px] py-2.5 transition-all duration-150 text-left px-3 flex items-center gap-2"
+          >
+            <span className="text-[#dcdcaa]">📧</span>
+            <div>
+              <div className="text-[12px] font-medium">Magic Link</div>
+              <div className="text-[10px] text-[#888]">Send a login link to your email</div>
+            </div>
+          </button>
+          <button
+            onClick={() => setMode('password')}
+            className="w-full bg-[#2d2d2d] hover:bg-[#3c3c3c] border border-[#3c3c3c] hover:border-[#569cd6]/40 text-[#cccccc] font-mono text-[11px] py-2.5 transition-all duration-150 text-left px-3 flex items-center gap-2"
+          >
+            <span className="text-[#569cd6]">🔑</span>
+            <div>
+              <div className="text-[12px] font-medium">Password Login</div>
+              <div className="text-[10px] text-[#888]">Sign in with email + password</div>
+            </div>
+          </button>
+          <button
+            onClick={() => setMode('signup')}
+            className="w-full bg-[#2d2d2d] hover:bg-[#3c3c3c] border border-[#3c3c3c] hover:border-[#569cd6]/40 text-[#cccccc] font-mono text-[11px] py-2.5 transition-all duration-150 text-left px-3 flex items-center gap-2"
+          >
+            <span className="text-[#98c379]">➕</span>
+            <div>
+              <div className="text-[12px] font-medium">Sign Up</div>
+              <div className="text-[10px] text-[#888]">Create a new account</div>
+            </div>
+          </button>
+        </div>
+      )}
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => onEmailLogin(val)}
-          disabled={!val.trim()}
-          className="flex-1 bg-[#0e639c] hover:bg-[#1177bb] disabled:opacity-40 disabled:cursor-not-allowed text-white font-mono text-[11px] py-1.5 transition-colors uppercase tracking-wider"
-        >
-          SEND LOGIN CODE
-        </button>
-        <button
-          onClick={onGithubLogin}
-          className="px-3 bg-[#2d2d2d] hover:bg-[#3c3c3c] text-[#cccccc] font-mono text-[11px] border border-[#3c3c3c] transition-colors"
-          title="Sign in with GitHub"
-        >
-          GH
-        </button>
-      </div>
+      {/* Email input (all modes) */}
+      {mode !== 'select' && (
+        <div className="space-y-1">
+          <label className="font-mono text-[10px] text-[#888] uppercase tracking-wider">Email</label>
+          <input
+            type="email"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            placeholder="user@example.com"
+            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] text-[12px] text-[#cccccc] px-2.5 py-2 font-mono outline-none focus:border-[#569cd6]/50 transition-colors placeholder:text-[#808080]/50"
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Password input (password & signup modes) */}
+      {(mode === 'password' || mode === 'signup') && (
+        <div className="space-y-1">
+          <label className="font-mono text-[10px] text-[#888] uppercase tracking-wider">Password</label>
+          <input
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder="Min 6 characters"
+            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] text-[12px] text-[#cccccc] px-2.5 py-2 font-mono outline-none focus:border-[#569cd6]/50 transition-colors placeholder:text-[#808080]/50"
+          />
+        </div>
+      )}
+
+      {/* Confirm password (signup only) */}
+      {mode === 'signup' && (
+        <div className="space-y-1">
+          <label className="font-mono text-[10px] text-[#888] uppercase tracking-wider">Confirm Password</label>
+          <input
+            type="password"
+            value={passConfirm}
+            onChange={(e) => { setPassConfirm(e.target.value); setSignupError('') }}
+            placeholder="Re-enter password"
+            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] text-[12px] text-[#cccccc] px-2.5 py-2 font-mono outline-none focus:border-[#569cd6]/50 transition-colors placeholder:text-[#808080]/50"
+          />
+          {signupError && (
+            <div className="text-[10px] text-[#f44747] mt-0.5">{signupError}</div>
+          )}
+        </div>
+      )}
+
+      {/* Buttons */}
+      {mode !== 'select' && (
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => { setMode('select'); setSignupError(''); setPassConfirm(''); setPass('') }}
+            className="px-3 py-1.5 bg-[#2d2d2d] hover:bg-[#3c3c3c] text-[#888] font-mono text-[10px] border border-[#3c3c3c] transition-colors uppercase"
+          >
+            ← Back
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={
+              !emailValid ||
+              (mode === 'password' && !passValid) ||
+              (mode === 'signup' && (!passValid || !passConfirm))
+            }
+            className="flex-1 bg-[#0e639c] hover:bg-[#1177bb] disabled:opacity-40 disabled:cursor-not-allowed text-white font-mono text-[11px] py-1.5 transition-colors uppercase tracking-wider"
+          >
+            {mode === 'magic' ? 'SEND MAGIC LINK' : mode === 'password' ? 'SIGN IN' : 'CREATE ACCOUNT'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -819,7 +1164,6 @@ function WindowFiles() {
             className="flex items-center px-2 py-[3px] hover:bg-[#2d2d2d] cursor-pointer transition-colors group"
             onClick={() => !f.isDir && setPreviewFile(previewFile?.name === f.name ? null : f)}
           >
-            {/* 图标 */}
             <span className="w-5 shrink-0 text-center text-[12px]">
               {f.isDir ? (
                 <span className="text-[#569cd6]">📁</span>
@@ -837,62 +1181,38 @@ function WindowFiles() {
                 <span>📄</span>
               )}
             </span>
-
-            {/* 文件名 */}
             <span className={`flex-1 truncate group-hover:underline ${
               f.isDir ? 'text-[#569cd6]' : 'text-[#cccccc]'
             }`}>
               {f.name}{f.isDir ? '/' : ''}
             </span>
-
-            {/* 大小 */}
             <span className="w-[60px] text-right text-[#888]">{f.size}</span>
-
-            {/* 大小进度条 */}
             <span className="w-[80px] text-right shrink-0">
               {!f.isDir && (
                 <span className="inline-block bg-[#264f78] h-2 rounded-sm" style={{ width: `${barWidth(f.size)}px` }} />
               )}
               {f.isDir && <span className="text-[#888]">{"<DIR>"}</span>}
             </span>
-
-            {/* 日期 */}
             <span className="w-[80px] text-right text-[#888] text-[10px]">{f.date}</span>
           </div>
         ))}
       </div>
 
-      {/* 预览面板 */}
       {previewFile && (
         <div className="shrink-0 border-t border-[#3c3c3c] bg-[#252526] p-2 max-h-[120px] overflow-auto">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[#569cd6] text-[10px]">📄 PREVIEW</span>
             <span className="text-[#dcdcaa] text-[10px]">{previewFile.name}</span>
             <span className="flex-1" />
-            <button
-              onClick={() => setPreviewFile(null)}
-              className="text-[#888] hover:text-[#f44747] text-[10px]"
-            >
-              ✕
-            </button>
+            <button onClick={() => setPreviewFile(null)} className="text-[#888] hover:text-[#f44747] text-[10px]">✕</button>
           </div>
-          <div className="font-mono text-[10px] text-[#cccccc] whitespace-pre-wrap opacity-80">
-            {previewFile.content || '(empty)'}
-          </div>
+          <div className="font-mono text-[10px] text-[#cccccc] whitespace-pre-wrap opacity-80">{previewFile.content || '(empty)'}</div>
         </div>
       )}
 
-      {/* 彩蛋：底部状态条随机信息 */}
       <div className="shrink-0 bg-[#007acc] h-[18px] flex items-center px-2">
         <span className="text-[9px] text-white/60 font-mono">
-          {[
-            '一切正常 | All systems nominal',
-            '肚子饿了喵 ~',
-            `uptime: ${Math.floor(Math.random() * 999)}d`,
-            '🔒 RLS active',
-            '📡 Realtime connected',
-            '🧶 chasing yarn balls...',
-          ][Math.floor(Math.random() * 6)]}
+          {['一切正常 | All systems nominal', '肚子饿了喵 ~', `uptime: ${Math.floor(Math.random() * 999)}d`, '🔒 RLS active', '📡 Realtime connected', '🧶 chasing yarn balls...'][Math.floor(Math.random() * 6)]}
         </span>
       </div>
     </div>

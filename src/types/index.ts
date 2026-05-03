@@ -8,6 +8,19 @@ export interface Profile {
   updated_at: string
 }
 
+export interface ProviderConfig {
+  provider: string
+  name: string
+  apiUrl: string
+  apiKeys: string[]
+  /** 预设模型列表（该厂商的推荐模型） */
+  models?: string[]
+  /** 当前选中（活跃）的 Key 索引，用于轮询追踪 */
+  keyIndex?: number
+  /** 厂商标识色 */
+  color?: string
+}
+
 export interface Conversation {
   id: string
   user_id: string
@@ -19,6 +32,7 @@ export interface Conversation {
   is_archived: boolean
   created_at: string
   updated_at: string
+  provider_configs?: ProviderConfig[] | null
 }
 
 export type MessageRole = 'system' | 'user' | 'assistant'
