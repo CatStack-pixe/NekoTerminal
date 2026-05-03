@@ -135,7 +135,7 @@ export function MessageList({
           </code>
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[11px] text-terminal-primary/80">
-              ⏳ 正在连接神经中枢...
+              [CONNECTING] 正在连接神经中枢...
             </div>
           </div>
         </div>
@@ -149,7 +149,7 @@ export function MessageList({
           </code>
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[11px] text-terminal-primary/80">
-              🧠 正在释放神经递质...
+              [FIRST_TOKEN] 正在释放神经递质...
             </div>
           </div>
         </div>
@@ -178,7 +178,7 @@ export function MessageList({
       {streamError && (
         <div className="flex gap-2 px-3 py-2 border-b border-terminal-border/50 bg-terminal-bg">
           <code className="text-red-500/60 text-xs shrink-0 mt-0.5 select-none min-w-[2ch] text-right">
-            {'✕'}
+            {'>'}
           </code>
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[11px] text-red-500/80 mb-0.5">
