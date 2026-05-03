@@ -53,15 +53,20 @@ export function MessageList({
     }
   }, [onLoadMore, hasMore, isLoadingMore])
 
-  // "正在释放神经递质" 短暂闪现
+  // "正在释放神经递质" 短暂闪现（仅首次 first-token 触发一次）
   const [showFirstTokenMsg, setShowFirstTokenMsg] = useState(false)
+  const firstTokenFiredRef = useRef(false)
   useEffect(() => {
-    if (streamPhase === 'first-token' && streamingContent) {
-      setShowFirstTokenMsg(true)
-      const timer = setTimeout(() => setShowFirstTokenMsg(false), 1500)
-      return () => clearTimeout(timer)
+    if (streamPhase !== 'first-token') {
+      firstTokenFiredRef.current = false
+      return
     }
-  }, [streamPhase, streamingContent])
+    if (firstTokenFiredRef.current) return
+    firstTokenFiredRef.current = true
+    setShowFirstTokenMsg(true)
+    const timer = setTimeout(() => setShowFirstTokenMsg(false), 1500)
+    return () => clearTimeout(timer)
+  }, [streamPhase])
 
   // 检查 pendingUserContent 是否已出现在 DB 消息中
   const latestUserMsg = [...messages].reverse().find(m => m.role === 'user')

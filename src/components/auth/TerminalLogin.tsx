@@ -180,7 +180,7 @@ interface TerminalLoginProps {
 }
 
 export function TerminalLogin({ alreadyLoggedIn = false, onUnlock }: TerminalLoginProps) {
-  const { user, signInWithEmail, signInWithPassword, signUp, updatePassword } = useAuth()
+  const { user, signInWithEmail, signInWithPassword, signUp, updatePassword, resetPasswordForEmail } = useAuth()
   const [phase, setPhase] = useState<Phase>('boot')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [bootIndex, setBootIndex] = useState(0)
@@ -352,7 +352,7 @@ export function TerminalLogin({ alreadyLoggedIn = false, onUnlock }: TerminalLog
   }
 
   // ====== 命令处理 ======
-  const handleCommand = (cmd: string) => {
+  const handleCommand = async (cmd: string) => {
     const trimmed = cmd.trim()
     const lower = trimmed.toLowerCase()
     setInput('')
@@ -405,7 +405,21 @@ export function TerminalLogin({ alreadyLoggedIn = false, onUnlock }: TerminalLog
       } else {
         setPhase('passwd-current')
         addLog('Enter current password (not verified, proceed to new password):', 'system')
-        addLog('(Type new password directly)', 'info')
+        addLog('(Type new password directly, or ^C to cancel)', 'info')
+      }
+    } else if (lower === 'passwd --reset') {
+      if (!user) {
+        addLog('passwd: you are not logged in', 'error')
+      } else {
+        setInfoMsg('Sending password reset email...')
+        const result = await resetPasswordForEmail(user.email ?? '')
+        if (result.error) {
+          addLog(`Error: ${result.error}`, 'error')
+        } else {
+          addLog(`[  OK  ] ${result.success}`, 'success')
+        }
+        setInfoMsg('')
+        setPhase('ready')
       }
     } else if (lower === 'window') {
       openWindow('login')
@@ -662,6 +676,7 @@ export function TerminalLogin({ alreadyLoggedIn = false, onUnlock }: TerminalLog
       const result = await updatePassword(trimmed)
       if (result.error) {
         addLog(`Error: ${result.error}`, 'error')
+        addLog('Tip: Type "passwd --reset" to send a password reset email instead.', 'info')
       } else {
         addLog('[  OK  ] Password updated successfully', 'success')
       }

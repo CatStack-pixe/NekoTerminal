@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<string, string> = {
   network: 'DEBUG',
   db: 'DEBUG',
   perf: 'DEBUG',
-  warn: 'WARN',
+  warn: 'WARNING',
   debug: 'DEBUG',
   key: 'INFO',
 }
@@ -26,7 +26,7 @@ const DEV_TYPES = new Set(['info', 'error', 'warn', 'debug', 'network', 'db', 'p
 // ========== 标签颜色映射 (MC 控制台风格) ==========
 const LABEL_COLORS: Record<string, string> = {
   INFO: 'text-gray-300',
-  WARN: 'text-yellow-400',
+  WARNING: 'text-yellow-400',
   ERROR: 'text-red-400',
   DEBUG: 'text-gray-500',
 }
@@ -84,13 +84,7 @@ function TerminalLogLine({ entry }: { entry: TerminalLogEntry }) {
 }
 
 // ========== 主组件 ==========
-interface DebugTerminalProps {
-  traceMode?: boolean
-}
-
-export function DebugTerminal({
-  traceMode = false,
-}: DebugTerminalProps) {
+export function DebugTerminal() {
   const { logs, clear } = useTerminalLogs()
   const [autoScroll, setAutoScroll] = useState(true)
   const [collapsed, setCollapsed] = useState(true)
@@ -135,27 +129,13 @@ export function DebugTerminal({
             {devLogs.length} entries
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {!autoScroll && (
-            <span className="text-[10px] text-yellow-400 font-mono animate-pulse">
-              SCROLL LOCK
-            </span>
-          )}
-          <span
-            className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              traceMode ? 'bg-green-400 animate-pulse' : 'bg-terminal-dim/30'
-            )}
-            title={traceMode ? 'Trace ON' : 'Trace OFF'}
-          />
-          <button
-            onClick={() => clear()}
-            className="text-[10px] text-terminal-dim hover:text-terminal-primary font-mono transition-colors"
-            title="Clear terminal"
-          >
-            [CLEAR]
-          </button>
-        </div>
+        <button
+          onClick={() => clear()}
+          className="text-[10px] text-terminal-dim hover:text-terminal-primary font-mono transition-colors"
+          title="Clear terminal"
+        >
+          [CLEAR]
+        </button>
       </div>
 
       {/* 展开区域：日志 */}

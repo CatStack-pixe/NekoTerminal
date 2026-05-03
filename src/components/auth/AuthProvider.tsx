@@ -14,6 +14,7 @@ interface AuthContextType {
   signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>
   signUp: (email: string, password: string) => Promise<{ error?: string; success?: string }>
   updatePassword: (newPassword: string) => Promise<{ error?: string; success?: string }>
+  resetPasswordForEmail: (email: string) => Promise<{ error?: string; success?: string }>
   verifyOtp: (email: string, token: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -97,6 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: '密码已更新' }
   }
 
+  // 发送密码重置邮件（当 updatePassword 失败时的备用方案）
+  const resetPasswordForEmail = async (email: string) => {
+    if (!supabase) return { error: 'Supabase 未配置' }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/auth/callback`,
+    })
+    if (error) return { error: error.message }
+    return { success: '密码重置邮件已发送，请检查邮箱' }
+  }
+
   // OTP 验证已废弃 —— 改用 Magic Link 回调流程
   const verifyOtp = async (_email: string, _token: string) => {
     return { error: 'OTP 已弃用，请使用 Magic Link 登录' }
@@ -120,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithPassword,
         signUp,
         updatePassword,
+        resetPasswordForEmail,
         verifyOtp,
         signOut,
       }}

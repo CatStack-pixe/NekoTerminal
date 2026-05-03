@@ -25,7 +25,7 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
-  const [traceMode, setTraceMode] = useState(false)
+  const [locked, setLocked] = useState(false)
 
   // 乐观消息 & 流式阶段
   const [pendingUserContent, setPendingUserContent] = useState<string | null>(null)
@@ -240,6 +240,15 @@ export default function HomePage() {
     )
   }
 
+  // ==================== 锁定态（已登录但终端锁定） ====================
+  if (locked && user) {
+    return (
+      <VSCodeShell>
+        <TerminalLogin alreadyLoggedIn onUnlock={() => setLocked(false)} />
+      </VSCodeShell>
+    )
+  }
+
   // ==================== 主界面 ====================
   return (
     <VSCodeShell
@@ -276,6 +285,7 @@ export default function HomePage() {
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             onOpenConfig={() => setConfigOpen(true)}
             onSignOut={signOut}
+            onLock={() => setLocked(true)}
           />
 
           <MessageList
@@ -299,9 +309,7 @@ export default function HomePage() {
       </div>
 
       {/* 底部终端面板 */}
-      <DebugTerminal
-        traceMode={traceMode}
-      />
+      <DebugTerminal />
 
       {/* 配置抽屉 */}
       <ConfigDrawer

@@ -5,9 +5,10 @@ interface ChatHeaderProps {
   onToggleSidebar?: () => void
   onOpenConfig?: () => void
   onSignOut?: () => void
+  onLock?: () => void
 }
 
-export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut }: ChatHeaderProps) {
+export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut, onLock }: ChatHeaderProps) {
   return (
     <div className="h-8 flex items-center justify-between px-3 border-b border-terminal-border bg-terminal-elevated shrink-0">
       {/* 左侧：汉堡按钮 + 路径 */}
@@ -33,6 +34,15 @@ export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut }: 
             className="font-mono text-[10px] text-terminal-dim hover:text-terminal-text transition-colors px-2"
           >
             SETTINGS
+          </button>
+        )}
+        {onLock && (
+          <button
+            onClick={onLock}
+            className="font-mono text-[10px] text-terminal-dim hover:text-terminal-amber transition-colors px-2"
+            title="Lock terminal"
+          >
+            LOCK
           </button>
         )}
         {onSignOut && (
