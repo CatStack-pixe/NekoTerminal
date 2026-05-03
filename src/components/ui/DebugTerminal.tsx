@@ -17,7 +17,11 @@ const TYPE_LABELS: Record<string, string> = {
   perf: 'DEBUG',
   warn: 'WARN',
   debug: 'DEBUG',
+  key: 'INFO',
 }
+
+// ========== 开发者模式：仅显示这些类型的日志 ==========
+const DEV_TYPES = new Set(['info', 'error', 'warn', 'debug', 'network', 'db', 'perf', 'key', 'system'])
 
 // ========== 标签颜色映射 (MC 控制台风格) ==========
 const LABEL_COLORS: Record<string, string> = {
@@ -93,12 +97,15 @@ export function DebugTerminal({
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // 仅显示开发者相关的日志
+  const devLogs = logs.filter((entry) => DEV_TYPES.has(entry.type))
+
   // 自动滚动到底部
   useEffect(() => {
     if (autoScroll) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [logs, autoScroll])
+  }, [devLogs, autoScroll])
 
   // 检测用户是否手动滚离底部
   const handleScroll = useCallback(() => {
@@ -122,10 +129,10 @@ export function DebugTerminal({
             {collapsed ? '▶' : '▼'}
           </button>
           <span className="text-[10px] text-terminal-dim font-mono tracking-wider uppercase">
-            TERMINAL
+            OUTPUT
           </span>
           <span className="text-[10px] text-terminal-dim/40 font-mono">
-            {logs.length} entries
+            {devLogs.length} entries
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -159,12 +166,12 @@ export function DebugTerminal({
           className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-xs leading-snug"
           style={{ scrollBehavior: 'smooth' }}
         >
-          {logs.length === 0 && (
+          {devLogs.length === 0 && (
             <div className="flex items-center justify-center h-full text-gray-600 text-xs font-mono">
-              {'>>> '}_ NO LOG ENTRIES
+              {'>>> '}_ NO OUTPUT
             </div>
           )}
-          {logs.map((entry) => (
+          {devLogs.map((entry) => (
             <TerminalLogLine key={entry.id} entry={entry} />
           ))}
           <div ref={bottomRef} />
