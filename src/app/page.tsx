@@ -15,7 +15,7 @@ import { useMessages } from '@/hooks/useMessages'
 import { useChatStream } from '@/hooks/useChatStream'
 import { useTerminalLogs } from '@/lib/terminal-log-context'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Conversation } from '@/types'
+import type { Conversation, Message } from '@/types'
 
 export default function HomePage() {
   const { user, loading: authLoading, signOut } = useAuth()
@@ -26,6 +26,11 @@ export default function HomePage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [traceMode, setTraceMode] = useState(false)
+
+  // 乐观消息 & 流式阶段
+  const [pendingUserContent, setPendingUserContent] = useState<string | null>(null)
+  const [streamPhase, setStreamPhase] = useState<'idle' | 'connecting' | 'first-token' | 'streaming'>('idle')
+  const [streamError, setStreamError] = useState<string | null>(null)
 
   const {
     conversations,
@@ -45,8 +50,8 @@ export default function HomePage() {
   const {
     streamingContent,
     isStreaming,
+    firstTokenReceived,
     isSending,
-    error: streamError,
     sendMessageAsync,
     clearStream,
   } = useChatStream()
@@ -76,9 +81,20 @@ export default function HomePage() {
       let apiKey: string
       let model: string
 
+      // 清除之前的错误
+      setStreamError(null)
+
+      // 乐观显示用户消息
+      setPendingUserContent(content)
+      setStreamPhase('connecting')
+
       if (convId) {
         const currentConv = conversations?.find((c: Conversation) => c.id === convId)
-        if (!currentConv) return
+        if (!currentConv) {
+          setPendingUserContent(null)
+          setStreamPhase('idle')
+          return
+        }
         apiUrl = currentConv.api_url
         apiKey = currentConv.api_key ?? ''
         model = currentConv.model
@@ -103,9 +119,21 @@ export default function HomePage() {
           apiUrl,
           apiKey,
           model,
+          onFirstToken: () => {
+            // 首个 token 到达，切换为"正在释放神经递质"
+            setStreamPhase('first-token')
+          },
         })
+        // 流式完成，等待 DB 刷新后移除乐观消息
+        setPendingUserContent(null)
+        setStreamPhase('idle')
+        setStreamError(null)
       } catch (err) {
-        terminalLog({ type: 'error', content: `SEND FAILED: ${err instanceof Error ? err.message : String(err)}`, conversationId: convId })
+        const errMsg = err instanceof Error ? err.message : String(err)
+        terminalLog({ type: 'error', content: `SEND FAILED: ${errMsg}`, conversationId: convId })
+        // 错误时：保留乐观用户消息，显示错误
+        setStreamPhase('idle')
+        setStreamError(errMsg)
       }
 
       // 等待 DB 数据刷新后再清除流式临时气泡，避免消息闪烁/丢失
@@ -205,6 +233,9 @@ export default function HomePage() {
             messages={messages ?? []}
             streamingContent={streamingContent}
             isStreaming={isStreaming}
+            streamPhase={streamPhase}
+            streamError={streamError}
+            pendingUserContent={pendingUserContent}
             hasMore={!!hasNextPage}
             isLoadingMore={isFetchingNextPage}
             onLoadMore={() => fetchNextPage()}

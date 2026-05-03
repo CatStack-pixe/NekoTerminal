@@ -5,23 +5,22 @@ import { useMutation } from '@tanstack/react-query'
 import { useTerminalLogs } from '@/lib/terminal-log-context'
 import type { Message } from '@/types'
 
-interface ChatStreamOptions {
-  conversationId: string
-  onToken?: (token: string) => void
-  onComplete?: (fullContent: string) => void
-  onError?: (error: Error) => void
-}
-
 export function useChatStream() {
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [firstTokenReceived, setFirstTokenReceived] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const firstTokenRef = useRef(false)
+  const onFirstTokenRef = useRef<(() => void) | null>(null)
   const { append: terminalLog } = useTerminalLogs()
   const tokenBatchRef = useRef('')
 
   const clearStream = useCallback(() => {
     setStreamingContent('')
     setIsStreaming(false)
+    setFirstTokenReceived(false)
+    firstTokenRef.current = false
+    onFirstTokenRef.current = null
   }, [])
 
   // 流结束后只标记停止，不清空内容 —— 等 DB refetch 后再调用 clearStream
@@ -41,16 +40,22 @@ export function useChatStream() {
       apiUrl,
       apiKey,
       model,
+      onFirstToken,
     }: {
       conversationId: string
       messages: Pick<Message, 'role' | 'content'>[]
       apiUrl: string
       apiKey: string
       model: string
+      onFirstToken?: () => void
     }) => {
+      onFirstTokenRef.current = onFirstToken ?? null
+
       const startTime = performance.now()
       setIsStreaming(true)
       setStreamingContent('')
+      setFirstTokenReceived(false)
+      firstTokenRef.current = false
 
       const controller = new AbortController()
       abortControllerRef.current = controller
@@ -139,6 +144,11 @@ export function useChatStream() {
               if (token && typeof token === 'string') {
                 fullContent += token
                 setStreamingContent((prev) => prev + token)
+                if (!firstTokenRef.current) {
+                  firstTokenRef.current = true
+                  setFirstTokenReceived(true)
+                  onFirstTokenRef.current?.()
+                }
                 tokenBatchRef.current += token
                 if (tokenBatchRef.current.length >= 8) {
                   terminalLog({ type: 'token', content: tokenBatchRef.current, conversationId })
@@ -201,6 +211,8 @@ export function useChatStream() {
     onError: (error) => {
       setIsStreaming(false)
       setStreamingContent('')
+      firstTokenRef.current = false
+      onFirstTokenRef.current = null
       terminalLog({
         type: 'error',
         content: `❌ STREAM ABORTED: ${error instanceof Error ? error.message : String(error)}`,
@@ -212,6 +224,7 @@ export function useChatStream() {
   return {
     streamingContent,
     isStreaming,
+    firstTokenReceived,
     sendMessage: streamMutation.mutate,
     sendMessageAsync: streamMutation.mutateAsync,
     isSending: streamMutation.isPending,
