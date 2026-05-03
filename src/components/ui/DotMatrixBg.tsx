@@ -10,7 +10,6 @@ interface VSCodeShellProps {
 
 export function VSCodeShell({ children, connectionStatus = 'idle' }: VSCodeShellProps) {
   const [time, setTime] = useState('--:--:--')
-  const [forceLandscape, setForceLandscape] = useState(false)
 
   useEffect(() => {
     const update = () => {
@@ -21,41 +20,8 @@ export function VSCodeShell({ children, connectionStatus = 'idle' }: VSCodeShell
     return () => clearInterval(timer)
   }, [])
 
-  // 手机竖屏 → 强制旋转为横屏显示
-  useEffect(() => {
-    const checkOrientation = () => {
-      const isSmall = window.innerWidth < 1024
-      const isPortrait = window.matchMedia('(orientation: portrait)').matches
-      setForceLandscape(isSmall && isPortrait)
-    }
-    checkOrientation()
-    const mq = window.matchMedia('(orientation: portrait)')
-    mq.addEventListener('change', checkOrientation)
-    window.addEventListener('resize', checkOrientation)
-    return () => {
-      mq.removeEventListener('change', checkOrientation)
-      window.removeEventListener('resize', checkOrientation)
-    }
-  }, [])
-
   return (
-    <div
-      className="flex flex-col bg-[#1e1e1e]"
-      style={
-        forceLandscape
-          ? {
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vh',
-              height: '100vw',
-              transform: 'rotate(90deg)',
-              transformOrigin: 'top left',
-              translate: '0 100vw',
-            }
-          : { width: '100%', height: '100vh' }
-      }
-    >
+    <div className="flex flex-col bg-[#1e1e1e] w-full h-dvh overflow-hidden">
       {/* VS Code 风格标题栏 */}
       <div className="h-8 bg-[#323233] flex items-center justify-between px-4 shrink-0 select-none">
         <div className="flex items-center gap-1">

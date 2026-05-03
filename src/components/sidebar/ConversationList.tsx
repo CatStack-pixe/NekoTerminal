@@ -10,6 +10,7 @@ interface ConversationListProps {
   isLoading?: boolean
   onSelect?: (conv: Conversation) => void
   onDelete?: (conv: Conversation) => void
+  onRename?: (conv: Conversation, title: string) => void
 }
 
 export function ConversationList({
@@ -18,6 +19,7 @@ export function ConversationList({
   isLoading,
   onSelect,
   onDelete,
+  onRename,
 }: ConversationListProps) {
   if (isLoading) {
     return (
@@ -46,6 +48,7 @@ export function ConversationList({
           isActive={conv.id === activeId}
           onClick={() => onSelect?.(conv)}
           onDelete={() => onDelete?.(conv)}
+          onRename={(title) => onRename?.(conv, title)}
         />
       ))}
     </>

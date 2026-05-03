@@ -34,7 +34,7 @@ export default function HomePage() {
 
   const {
     conversations,
-    isLoading: _convLoading,
+    isLoading: convLoading,
     createConversation,
     updateConversation,
     deleteConversation,
@@ -189,6 +189,15 @@ export default function HomePage() {
     ]
   )
 
+  // 重命名对话
+  const handleRename = useCallback(
+    (conv: Conversation, title: string) => {
+      updateConversation.mutate({ id: conv.id, title })
+      terminalLog({ type: 'info', content: `RENAMED: "${conv.title}" → "${title}"`, conversationId: conv.id })
+    },
+    [updateConversation, terminalLog]
+  )
+
   // 保存配置
   const handleConfigSave = useCallback(
     (data: { title: string; model: string; apiUrl: string; apiKey: string; systemPrompt: string; providerConfigs?: ProviderConfig[] | null }) => {
@@ -247,12 +256,14 @@ export default function HomePage() {
           isOpen={sidebarOpen}
           conversations={conversations ?? []}
           activeId={activeConversationId ?? undefined}
+          isLoading={convLoading}
           onSelectConversation={(conv) => {
             setActiveConversationId(conv.id)
             // 移动端选择后自动关闭侧边栏
             if (window.innerWidth < 1024) setSidebarOpen(false)
           }}
           onDeleteConversation={(conv) => deleteConversation.mutate(conv.id)}
+          onRenameConversation={handleRename}
           onNewConversation={handleNewChat}
           onClose={() => setSidebarOpen(false)}
           onOpen={() => setSidebarOpen(true)}

@@ -10,6 +10,7 @@ interface SidebarProps {
   isLoading?: boolean
   onSelectConversation?: (conv: Conversation) => void
   onDeleteConversation?: (conv: Conversation) => void
+  onRenameConversation?: (conv: Conversation, title: string) => void
   onNewConversation?: () => void
   onClose?: () => void
   onOpen?: () => void
@@ -22,6 +23,7 @@ export function Sidebar({
   isLoading,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
   onNewConversation,
   onClose,
   onOpen,
@@ -103,6 +105,7 @@ export function Sidebar({
             isLoading={isLoading}
             onSelect={onSelectConversation}
             onDelete={onDeleteConversation}
+            onRename={onRenameConversation}
           />
         </div>
 
