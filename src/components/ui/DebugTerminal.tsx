@@ -3,69 +3,55 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { useTerminalLogs, type TerminalLogEntry } from '@/lib/terminal-log-context'
-import {
-  CATSTACK_BANNER,
-  asciiTable,
-  doubleDivider,
-  singleDivider,
-  progressBar,
-  statusLabel,
-  SPINNER_FRAMES,
-} from '@/lib/ascii-art'
 
-// ========== 类型颜色映射 ==========
-const TYPE_COLORS: Record<string, string> = {
-  system: 'text-terminal-dim',
-  user: 'text-terminal-amber/80',
-  ai: 'text-terminal-text',
-  error: 'text-red-400',
-  info: 'text-terminal-dim',
-  token: 'text-terminal-text opacity-50',
-  network: 'text-cyan-400',
-  db: 'text-green-400',
-  perf: 'text-yellow-400',
-  warn: 'text-yellow-300',
-  debug: 'text-purple-400',
+// ========== 类型 → 日志级别标签映射 (MC 控制台风格) ==========
+const TYPE_LABELS: Record<string, string> = {
+  system: 'INFO',
+  user: 'INFO',
+  ai: 'INFO',
+  error: 'ERROR',
+  info: 'INFO',
+  token: 'DEBUG',
+  network: 'DEBUG',
+  db: 'DEBUG',
+  perf: 'DEBUG',
+  warn: 'WARN',
+  debug: 'DEBUG',
 }
 
-const TYPE_PREFIX: Record<string, string> = {
-  system: '⚙',
-  user: '▶',
-  ai: '◀',
-  error: '✖',
-  info: 'ℹ',
-  token: '·',
-  network: '⬡',
-  db: '⬢',
-  perf: '⏱',
-  warn: '⚠',
-  debug: '🐛',
+// ========== 标签颜色映射 (MC 控制台风格) ==========
+const LABEL_COLORS: Record<string, string> = {
+  INFO: 'text-gray-300',
+  WARN: 'text-yellow-400',
+  ERROR: 'text-red-400',
+  DEBUG: 'text-gray-500',
 }
 
 // ========== 日志行组件 ==========
 function TerminalLogLine({ entry }: { entry: TerminalLogEntry }) {
   const [expanded, setExpanded] = useState(false)
+  const label = TYPE_LABELS[entry.type] ?? 'INFO'
 
   return (
     <div
       className={cn(
         'group flex items-start gap-1.5 py-0.5 font-mono text-xs leading-relaxed cursor-pointer hover:bg-white/5 px-2',
-        TYPE_COLORS[entry.type]
+        LABEL_COLORS[label] ?? 'text-gray-300'
       )}
       onClick={() => entry.meta && setExpanded(!expanded)}
     >
       {/* 时间戳 */}
-      <span className="text-terminal-dim/40 shrink-0 select-none text-[10px] pt-px">
+      <span className="text-gray-600 shrink-0 select-none text-[10px] pt-px">
         {entry.timestamp}
       </span>
       {/* 类型标签 */}
       <span
         className={cn(
-          'shrink-0 select-none w-4 text-center',
-          TYPE_COLORS[entry.type]
+          'shrink-0 select-none font-bold text-[10px]',
+          LABEL_COLORS[label]
         )}
       >
-        {TYPE_PREFIX[entry.type] ?? '·'}
+        [{label}]
       </span>
       {/* 内容 */}
       <span className="flex-1 break-words whitespace-pre-wrap">
@@ -73,19 +59,19 @@ function TerminalLogLine({ entry }: { entry: TerminalLogEntry }) {
       </span>
       {/* 会话 ID 短码 */}
       {entry.conversationId && (
-        <span className="text-terminal-dim/20 shrink-0 select-none text-[10px]">
+        <span className="text-gray-700 shrink-0 select-none text-[10px]">
           #{entry.conversationId.slice(0, 6)}
         </span>
       )}
       {/* meta 展开指示 */}
       {entry.meta && (
-        <span className="text-terminal-dim/30 shrink-0 select-none text-[10px]">
+        <span className="text-gray-600 shrink-0 select-none text-[10px]">
           {expanded ? '▼' : '▶'}
         </span>
       )}
       {/* 展开的 meta 数据 */}
       {expanded && entry.meta && (
-        <div className="w-full pl-14 text-[10px] text-terminal-dim/60 whitespace-pre-wrap font-mono mt-0.5 border-l border-terminal-border/30 pl-3 ml-2">
+        <div className="w-full pl-14 text-[10px] text-gray-500 whitespace-pre-wrap font-mono mt-0.5 border-l border-gray-700/30 pl-3 ml-2">
           {JSON.stringify(entry.meta, null, 2)}
         </div>
       )}
@@ -93,52 +79,18 @@ function TerminalLogLine({ entry }: { entry: TerminalLogEntry }) {
   )
 }
 
-// ========== 帮助文本 ==========
-const HELP_TEXT = [
-  doubleDivider(40),
-  '  CATSTACK TERMINAL COMMAND LINE v2.0',
-  singleDivider(40),
-  '  /help         — Show this help',
-  '  /clear        — Clear terminal screen',
-  '  /banner       — Display CatStack ASCII art',
-  '  /status       — System diagnostics panel',
-  '  /inspect      — Show current session details',
-  '  /trace        — Toggle detailed trace mode',
-  '  /echo <text>  — Echo text back',
-  '  /models       — List available AI models',
-  singleDivider(40),
-  '  All slash commands also auto-log to terminal.',
-  doubleDivider(40),
-].join('\n')
-
 // ========== 主组件 ==========
 interface DebugTerminalProps {
-  /** 当前对话信息，供 /status /inspect 使用 */
-  activeConversation?: {
-    id: string
-    title: string
-    model: string
-    api_url: string
-    created_at?: string
-  } | null
-  messageCount?: number
   traceMode?: boolean
-  onToggleTrace?: () => void
 }
 
 export function DebugTerminal({
-  activeConversation,
-  messageCount = 0,
   traceMode = false,
-  onToggleTrace,
 }: DebugTerminalProps) {
-  const { logs, append, clear } = useTerminalLogs()
-  const [input, setInput] = useState('')
+  const { logs, clear } = useTerminalLogs()
   const [autoScroll, setAutoScroll] = useState(true)
-  const [bannerShown, setBannerShown] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 自动滚动到底部
@@ -147,125 +99,6 @@ export function DebugTerminal({
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [logs, autoScroll])
-
-  // 首次加载显示 Banner
-  useEffect(() => {
-    if (!bannerShown) {
-      append({ type: 'system', content: CATSTACK_BANNER })
-      append({ type: 'system', content: HELP_TEXT })
-      setBannerShown(true)
-    }
-  }, [append, bannerShown])
-
-  // 点击日志区域聚焦输入框
-  const focusInput = useCallback(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  // 处理命令
-  const handleCommand = useCallback(
-    (cmd: string) => {
-      const trimmed = cmd.trim()
-      if (!trimmed) return
-
-      // 回显命令
-      append({ type: 'system', content: `$ ${trimmed}` })
-
-      const lower = trimmed.toLowerCase()
-
-      if (lower === '/help') {
-        append({ type: 'system', content: HELP_TEXT })
-      } else if (lower === '/clear') {
-        clear()
-      } else if (lower === '/banner') {
-        append({ type: 'system', content: CATSTACK_BANNER })
-      } else if (lower === '/status') {
-        const statusLines = [
-          doubleDivider(40),
-          '  SYSTEM STATUS',
-          singleDivider(40),
-          statusLabel('App', 'CatStack Terminal v2.0'),
-          statusLabel('Page URL', typeof window !== 'undefined' ? window.location.href : 'N/A'),
-          statusLabel('Timestamp', new Date().toISOString()),
-          statusLabel('Log Entries', String(logs.length)),
-          statusLabel('Trace Mode', traceMode ? 'ENABLED' : 'DISABLED'),
-          singleDivider(40),
-        ]
-        if (activeConversation) {
-          statusLines.push(
-            '  ACTIVE SESSION',
-            singleDivider(40),
-            statusLabel('Session ID', activeConversation.id),
-            statusLabel('Title', activeConversation.title),
-            statusLabel('Model', activeConversation.model),
-            statusLabel('API URL', activeConversation.api_url),
-            statusLabel('Messages', String(messageCount)),
-            singleDivider(40)
-          )
-        }
-        statusLines.push(doubleDivider(40))
-        append({ type: 'system', content: statusLines.join('\n') })
-      } else if (lower === '/inspect') {
-        if (!activeConversation) {
-          append({ type: 'warn', content: 'No active session to inspect.' })
-        } else {
-          const table = asciiTable(
-            ['Property', 'Value'],
-            [
-              ['ID', activeConversation.id],
-              ['Title', activeConversation.title],
-              ['Model', activeConversation.model],
-              ['API URL', activeConversation.api_url],
-              [
-                'Created',
-                activeConversation.created_at ?? 'N/A',
-              ],
-              ['Messages', String(messageCount)],
-              ['Log Entries', String(logs.length)],
-            ]
-          )
-          append({ type: 'system', content: table })
-        }
-      } else if (lower === '/trace') {
-        if (onToggleTrace) {
-          onToggleTrace()
-          append({
-            type: 'warn',
-            content: `TRACE MODE: ${!traceMode ? 'ENABLED' : 'DISABLED'}`,
-          })
-        } else {
-          append({ type: 'warn', content: 'Trace toggle not connected.' })
-        }
-      } else if (lower.startsWith('/echo ')) {
-        const text = trimmed.slice(6)
-        append({ type: 'system', content: text })
-      } else if (lower === '/models') {
-        const table = asciiTable(
-          ['Model', 'Provider', 'Context'],
-          [
-            ['deepseek-chat', 'DeepSeek', '64K'],
-            ['deepseek-reasoner', 'DeepSeek', '64K'],
-            ['gpt-4o', 'OpenAI', '128K'],
-            ['claude-3.5-sonnet', 'Anthropic', '200K'],
-            ['gemini-2.0-flash', 'Google', '1M'],
-            ['qwen-max', 'Alibaba', '32K'],
-          ]
-        )
-        append({ type: 'system', content: table })
-      } else {
-        append({ type: 'error', content: `UNKNOWN COMMAND: ${trimmed}. Try /help` })
-      }
-    },
-    [append, clear, logs.length, activeConversation, messageCount, traceMode, onToggleTrace]
-  )
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleCommand(input)
-      setInput('')
-    }
-  }
 
   // 检测用户是否手动滚离底部
   const handleScroll = useCallback(() => {
@@ -318,47 +151,24 @@ export function DebugTerminal({
         </div>
       </div>
 
-      {/* 展开区域：日志 + 输入 */}
+      {/* 展开区域：日志 */}
       {!collapsed && (
-        <>
-          {/* 日志区域 */}
-          <div
-            ref={containerRef}
-            onScroll={handleScroll}
-            onClick={focusInput}
-            className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-xs leading-snug"
-            style={{ scrollBehavior: 'smooth' }}
-          >
-            {logs.length === 0 && (
-              <div className="flex items-center justify-center h-full text-terminal-dim/30 text-xs font-mono">
-                {'>>> '}_ TERMINAL READY — TYPE /help FOR COMMANDS
-              </div>
-            )}
-            {logs.map((entry) => (
-              <TerminalLogLine key={entry.id} entry={entry} />
-            ))}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* 命令行输入 */}
-          <div className="flex items-center gap-1.5 px-2 py-1 border-t border-terminal-border/50 bg-[#1e1e1e]">
-            <span className="text-terminal-primary text-xs font-mono shrink-0">$</span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="type /help for commands..."
-              className="flex-1 bg-transparent border-none outline-none font-mono text-xs text-terminal-text placeholder:text-terminal-dim/30 py-0.5"
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <span className="text-terminal-primary/40 text-xs font-mono animate-pulse shrink-0">
-              ▊
-            </span>
-          </div>
-        </>
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-xs leading-snug"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          {logs.length === 0 && (
+            <div className="flex items-center justify-center h-full text-gray-600 text-xs font-mono">
+              {'>>> '}_ NO LOG ENTRIES
+            </div>
+          )}
+          {logs.map((entry) => (
+            <TerminalLogLine key={entry.id} entry={entry} />
+          ))}
+          <div ref={bottomRef} />
+        </div>
       )}
     </div>
   )

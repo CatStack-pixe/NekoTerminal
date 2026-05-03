@@ -220,20 +220,7 @@ export default function HomePage() {
 
       {/* 底部终端面板 */}
       <DebugTerminal
-        activeConversation={
-          activeConversation
-            ? {
-                id: activeConversation.id,
-                title: activeConversation.title,
-                model: activeConversation.model,
-                api_url: activeConversation.api_url,
-                created_at: activeConversation.created_at,
-              }
-            : null
-        }
-        messageCount={messages?.length ?? 0}
         traceMode={traceMode}
-        onToggleTrace={() => setTraceMode((prev) => !prev)}
       />
 
       {/* 配置抽屉 */}
