@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, use } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { VSCodeShell } from '@/components/ui/DotMatrixBg'
 
 interface DebugSnapshot {
@@ -86,8 +86,8 @@ function LoadingShell() {
   )
 }
 
-function DebugPageContent({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params)
+function DebugPageContent({ params }: { params: { token: string } }) {
+  const { token } = params
   const [snapshot, setSnapshot] = useState<DebugSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -227,7 +227,7 @@ function DebugPageContent({ params }: { params: Promise<{ token: string }> }) {
   )
 }
 
-export default function DebugPage({ params }: { params: Promise<{ token: string }> }) {
+export default function DebugPage({ params }: { params: { token: string } }) {
   return (
     <Suspense fallback={<LoadingShell />}>
       <DebugPageContent params={params} />
