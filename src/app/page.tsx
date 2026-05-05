@@ -32,6 +32,10 @@ export default function HomePage() {
   const [streamPhase, setStreamPhase] = useState<'idle' | 'connecting' | 'first-token' | 'streaming'>('idle')
   const [streamError, setStreamError] = useState<string | null>(null)
 
+  // 分享 debug 链接
+  const [isSharing, setIsSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+
   const {
     conversations,
     isLoading: convLoading,
@@ -198,6 +202,33 @@ export default function HomePage() {
     [updateConversation, terminalLog]
   )
 
+  // 分享 Debug 快照
+  const handleShareDebug = useCallback(async () => {
+    if (!activeConversationId) return
+    setIsSharing(true)
+    setShareUrl(null)
+    try {
+      const res = await fetch('/api/debug/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: activeConversationId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to create snapshot')
+      setShareUrl(data.url)
+      await navigator.clipboard.writeText(data.url)
+      terminalLog({ type: 'info', content: `DEBUG LINK COPIED: ${data.url}`, conversationId: activeConversationId })
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      terminalLog({ type: 'error', content: `SHARE DEBUG FAILED: ${errMsg}`, conversationId: activeConversationId })
+    } finally {
+      setIsSharing(false)
+    }
+  }, [activeConversationId, terminalLog])
+
+  // 是否有对话内容 (有消息或有流式内容)
+  const hasContent = (messages?.length ?? 0) > 0 || !!streamingContent
+
   // 保存配置
   const handleConfigSave = useCallback(
     (data: { title: string; model: string; apiUrl: string; apiKey: string; systemPrompt: string; providerConfigs?: ProviderConfig[] | null }) => {
@@ -286,6 +317,9 @@ export default function HomePage() {
             onOpenConfig={() => setConfigOpen(true)}
             onSignOut={signOut}
             onLock={() => setLocked(true)}
+            onShareDebug={handleShareDebug}
+            hasContent={hasContent}
+            isSharing={isSharing}
           />
 
           <MessageList

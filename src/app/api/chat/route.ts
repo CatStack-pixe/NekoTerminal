@@ -7,13 +7,28 @@ export const maxDuration = 30
 
 const LOG_PREFIX = '[catstack::server]'
 
+interface DebugEntry {
+  timestamp: number
+  type: string
+  content: string
+  meta?: Record<string, unknown>
+}
+
 export async function POST(request: NextRequest) {
+  // 服务端调试日志收集器
+  const debugLogs: DebugEntry[] = []
+
+  const serverLog = (type: string, content: string, meta?: Record<string, unknown>) => {
+    debugLogs.push({ timestamp: Date.now(), type, content, meta })
+  }
+
   try {
     const body = await request.json()
     const { conversationId, messages, apiUrl, apiKey, model } = body
     const shortId = conversationId?.slice(0, 6) ?? '????'
 
     console.log(`${LOG_PREFIX} REQ conv=${shortId} model=${model} url=${apiUrl}`)
+    serverLog('network', `CONNECT → ${apiUrl}`, { model, messageCount: messages?.length })
 
     if (!conversationId || !messages?.length || !apiUrl || !apiKey || !model) {
       console.warn(`${LOG_PREFIX} BAD_REQUEST missing fields`)
@@ -67,8 +82,10 @@ export async function POST(request: NextRequest) {
       })
       if (userMsgError) {
         console.error(`${LOG_PREFIX} DB_WRITE_ERROR user_msg:`, JSON.stringify(userMsgError))
+        serverLog('error', `DB WRITE ERROR (user_msg): ${JSON.stringify(userMsgError)}`)
       } else {
         console.log(`${LOG_PREFIX} DB user_msg SAVED (${lastUserMessage.content.slice(0, 50)}...)`)
+        serverLog('db', `user_msg SAVED (${lastUserMessage.content.slice(0, 50)}...)`)
       }
     }
 
@@ -94,7 +111,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (conv?.system_prompt) {
-      // 查找是否已有 system 消息，有则替换，无则插入到最前
       const existingSystemIdx = aiMessages.findIndex((m) => m.role === 'system')
       if (existingSystemIdx >= 0) {
         aiMessages[existingSystemIdx] = { role: 'system', content: conv.system_prompt }
@@ -104,7 +120,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用 AI API (兼容 OpenAI 格式)
+    const aiStartTime = performance.now()
     console.log(`${LOG_PREFIX} AI_REQ model=${model} msgCount=${aiMessages.length}`)
+    serverLog('network', `AI_REQ model=${model} msgCount=${aiMessages.length}`)
 
     const aiResponse = await fetch(`${apiUrl}/chat/completions`, {
       method: 'POST',
@@ -119,9 +137,16 @@ export async function POST(request: NextRequest) {
       }),
     })
 
+    const networkTime = (performance.now() - aiStartTime).toFixed(0)
+    serverLog('network', `RESPONSE ${aiResponse.status} (${networkTime}ms)`, {
+      status: aiResponse.status,
+      timing: `${networkTime}ms`,
+    })
+
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text()
       console.error(`${LOG_PREFIX} AI_ERROR status=${aiResponse.status}: ${errorText}`)
+      serverLog('error', `HTTP ${aiResponse.status}: ${errorText.slice(0, 200)}`)
       return new Response(JSON.stringify({ error: `AI API error: ${errorText}` }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
@@ -138,9 +163,54 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // ====== 增量写入：开局先建一条占位 assistant 消息 ======
+    let assistantMessageId: string | null = null
+    {
+      const { data: placeholder, error: placeholderErr } = await serviceClient
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: '',
+          is_partial: true,
+        })
+        .select('id')
+        .single()
+
+      if (placeholderErr) {
+        console.error(`${LOG_PREFIX} DB_PLACEHOLDER_ERROR:`, JSON.stringify(placeholderErr))
+        serverLog('error', `PLACEHOLDER INSERT ERROR: ${JSON.stringify(placeholderErr)}`)
+      } else if (placeholder) {
+        assistantMessageId = placeholder.id
+        serverLog('db', `PLACEHOLDER created id=${assistantMessageId?.slice(0, 8) ?? '????'}`)
+      }
+    }
+
     let fullResponse = ''
     const encoder = new TextEncoder()
     const decoder = new TextDecoder()
+    const streamStartTime = performance.now()
+    let chunkCount = 0
+    let totalBytes = 0
+    let lastDbUpdate = 0
+
+    // ====== 增量更新辅助函数 ======
+    const msgId = assistantMessageId
+    const incrementalDbUpdate = async (content: string) => {
+      if (!msgId) return
+      try {
+        const { error } = await serviceClient
+          .from('messages')
+          .update({ content, is_partial: true })
+          .eq('id', msgId)
+
+        if (error) {
+          serverLog('error', `INCREMENTAL UPDATE ERROR: ${JSON.stringify(error)}`)
+        }
+      } catch (e) {
+        serverLog('error', `INCREMENTAL UPDATE EXCEPTION: ${String(e)}`)
+      }
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -161,11 +231,9 @@ export async function POST(request: NextRequest) {
                         const token = parsed.choices?.[0]?.delta?.content ?? ''
                         if (token) {
                           fullResponse += token
-                          // 发送纯净的 token 给客户端 (JSON 包裹避免换行问题)
                           controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`))
                         }
                       } catch {
-                        // 非 JSON 行，直接转发
                         fullResponse += raw
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify(raw)}\n\n`))
                       }
@@ -174,33 +242,49 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // 保存完整的 AI 回复到数据库 (使用 service_role 客户端确保写入)
-              if (fullResponse) {
-                console.log(`${LOG_PREFIX} DB ai_msg SAVING len=${fullResponse.length}`)
-                await serviceClient
+              // ====== 正常结束：finalize assistant 消息 ======
+              if (fullResponse && assistantMessageId) {
+                console.log(`${LOG_PREFIX} DB ai_msg FINALIZE len=${fullResponse.length}`)
+                serverLog('db', `FINALIZE assistant message (${fullResponse.length} chars)`)
+
+                const { error: finalErr } = await serviceClient
                   .from('messages')
-                  .insert({
-                    conversation_id: conversationId,
-                    role: 'assistant',
-                    content: fullResponse,
-                  })
-                  .throwOnError()
+                  .update({ content: fullResponse, is_partial: false })
+                  .eq('id', assistantMessageId)
 
-                // 更新对话的时间戳
-                await serviceClient
-                  .from('conversations')
-                  .update({ updated_at: new Date().toISOString() })
-                  .eq('id', conversationId)
-                  .throwOnError()
-
-                console.log(`${LOG_PREFIX} STREAM COMPLETE total=${fullResponse.length} chars`)
+                if (finalErr) {
+                  console.error(`${LOG_PREFIX} DB_FINALIZE_ERROR:`, JSON.stringify(finalErr))
+                  serverLog('error', `FINALIZE ERROR: ${JSON.stringify(finalErr)}`)
+                }
               }
 
-              // 发送结束信号
+              // 更新对话的时间戳
+              await serviceClient
+                .from('conversations')
+                .update({ updated_at: new Date().toISOString() })
+                .eq('id', conversationId)
+
+              const streamDuration = ((performance.now() - streamStartTime) / 1000).toFixed(1)
+              serverLog('perf', `STREAM COMPLETE — ${fullResponse.length} chars in ${streamDuration}s`, {
+                totalChars: fullResponse.length,
+                totalBytes,
+                chunkCount,
+                streamDuration: `${streamDuration}s`,
+              })
+
+              console.log(`${LOG_PREFIX} STREAM COMPLETE total=${fullResponse.length} chars`)
+
+              // ====== 发送 debug 信息给前端 ======
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ __debug: debugLogs })}\n\n`)
+              )
               controller.enqueue(encoder.encode('data: [DONE]\n\n'))
               controller.close()
               break
             }
+
+            chunkCount++
+            totalBytes += value?.length ?? 0
 
             // 将新数据追加到缓冲区
             sseBuffer += decoder.decode(value, { stream: true })
@@ -219,30 +303,53 @@ export async function POST(request: NextRequest) {
                   const token = parsed.choices?.[0]?.delta?.content ?? ''
                   if (token) {
                     fullResponse += token
-                    // 发送纯净的 token 给客户端 (JSON 包裹避免换行嵌入导致解析异常)
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`))
                   }
                 } catch {
-                  // 非 JSON 数据，直接作为文本转发
                   fullResponse += raw
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(raw)}\n\n`))
                 }
               }
             }
+
+            // ====== 每 8 chunks 增量写入 DB ======
+            if (chunkCount - lastDbUpdate >= 8 && fullResponse) {
+              lastDbUpdate = chunkCount
+              serverLog('db', `INCREMENTAL UPDATE #${chunkCount} (${fullResponse.length} chars)`)
+
+              // 不 await，fire-and-forget 避免阻塞流
+              incrementalDbUpdate(fullResponse)
+            }
           }
         } catch (error) {
           console.error(`${LOG_PREFIX} STREAM_ERROR:`, error)
+          serverLog('error', `STREAM_ERROR: ${error instanceof Error ? error.message : String(error)}`)
+
           // 即使出错，也尝试保存已收到的部分
-          if (fullResponse) {
-            const { error: partialSaveError } = await serviceClient.from('messages').insert({
-              conversation_id: conversationId,
-              role: 'assistant',
-              content: fullResponse + '\n\n[TRANSMISSION INTERRUPTED]',
-            })
+          if (fullResponse && assistantMessageId) {
+            const partialContent = fullResponse + '\n\n[TRANSMISSION INTERRUPTED]'
+            serverLog('db', `PARTIAL SAVE (${partialContent.length} chars)`)
+
+            const { error: partialSaveError } = await serviceClient
+              .from('messages')
+              .update({ content: partialContent, is_partial: false })
+              .eq('id', assistantMessageId)
+
             if (partialSaveError) {
               console.error(`${LOG_PREFIX} DB_PARTIAL_SAVE_ERROR:`, JSON.stringify(partialSaveError))
+              serverLog('error', `PARTIAL SAVE ERROR: ${JSON.stringify(partialSaveError)}`)
             }
           }
+
+          // 即使出错也发送 debug logs
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ __debug: debugLogs })}\n\n`)
+            )
+          } catch {
+            // controller 可能已经关闭
+          }
+
           try {
             controller.error(error)
           } catch {

@@ -6,9 +6,14 @@ interface ChatHeaderProps {
   onOpenConfig?: () => void
   onSignOut?: () => void
   onLock?: () => void
+  onShareDebug?: () => void
+  /** 是否有对话内容可分享 */
+  hasContent?: boolean
+  /** 是否正在生成分享链接 */
+  isSharing?: boolean
 }
 
-export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut, onLock }: ChatHeaderProps) {
+export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut, onLock, onShareDebug, hasContent, isSharing }: ChatHeaderProps) {
   return (
     <div className="h-8 flex items-center justify-between px-3 border-b border-terminal-border bg-terminal-elevated shrink-0">
       {/* 左侧：汉堡按钮 + 路径 */}
@@ -28,6 +33,20 @@ export function ChatHeader({ title, onToggleSidebar, onOpenConfig, onSignOut, on
 
       {/* 右侧 */}
       <div className="flex items-center gap-1 shrink-0">
+        {onShareDebug && hasContent && (
+          <button
+            onClick={onShareDebug}
+            disabled={isSharing}
+            className={`font-mono text-[10px] transition-colors px-2 ${
+              isSharing
+                ? 'text-terminal-dim/40 cursor-not-allowed'
+                : 'text-terminal-green/70 hover:text-terminal-green'
+            }`}
+            title="Generate shareable debug link"
+          >
+            {isSharing ? 'SHARING...' : 'SHARE DEBUG'}
+          </button>
+        )}
         {onOpenConfig && (
           <button
             onClick={onOpenConfig}
