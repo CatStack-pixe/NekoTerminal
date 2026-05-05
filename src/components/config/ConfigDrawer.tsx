@@ -311,7 +311,7 @@ export function ConfigDrawer({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-[18px] py-[18px] flex flex-col gap-4">
+        <form className="flex-1 overflow-y-auto px-[18px] py-[18px] flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
           {/* ========== 厂商列表 ========== */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between mb-1">
@@ -455,9 +455,9 @@ export function ConfigDrawer({
                               value={key}
                               onChange={(e) => updateKey(idx, ki, e.target.value)}
                               placeholder={`Key #${ki + 1}`}
-                              autoComplete="new-password"
-                              className="flex-1 font-mono text-[12px] bg-[#0d0d18] text-terminal-text border border-terminal-border px-2 py-1 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50"
-                            />
+                               autoComplete="off"
+                               className="flex-1 font-mono text-[12px] bg-[#0d0d18] text-terminal-text border border-terminal-border px-2 py-1 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50"
+                             />
                             <button
                               onClick={() => removeKey(idx, ki)}
                               className="font-mono text-[11px] text-terminal-dim hover:text-red-400 shrink-0 px-1"
@@ -556,8 +556,8 @@ export function ConfigDrawer({
                     emitSave({ apiKey: e.target.value })
                   }}
                   placeholder="sk-......"
-                  autoComplete="new-password"
-                  className="w-full font-mono text-[12px] bg-[#0d0d18] text-terminal-text border border-terminal-border px-2 py-1.5 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50"
+                   autoComplete="off"
+                   className="w-full font-mono text-[12px] bg-[#0d0d18] text-terminal-text border border-terminal-border px-2 py-1.5 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50"
                 />
               </div>
 
@@ -603,7 +603,7 @@ export function ConfigDrawer({
               className="flex-1 w-full min-h-[200px] resize-y font-mono text-[12px] leading-relaxed bg-[#0d0d18] text-terminal-text border border-terminal-border px-2 py-1.5 outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-primary/50"
             />
           </div>
-        </div>
+        </form>
       </div>
 
       {/* 模型广场选择器 */}

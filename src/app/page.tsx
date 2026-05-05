@@ -216,8 +216,8 @@ export default function HomePage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to create snapshot')
       setShareUrl(data.url)
-      await navigator.clipboard.writeText(data.url)
-      terminalLog({ type: 'info', content: `DEBUG LINK COPIED: ${data.url}`, conversationId: activeConversationId })
+      try { await navigator.clipboard.writeText(data.url) } catch { /* clipboard requires focus */ }
+      terminalLog({ type: 'info', content: `DEBUG LINK: ${data.url}`, conversationId: activeConversationId })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       terminalLog({ type: 'error', content: `SHARE DEBUG FAILED: ${errMsg}`, conversationId: activeConversationId })
