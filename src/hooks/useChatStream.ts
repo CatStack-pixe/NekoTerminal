@@ -2,20 +2,32 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { useTerminalLogs } from '@/lib/terminal-log-context'
+import { useTerminalLogs, type TerminalLogType } from '@/lib/terminal-log-context'
 import type { Message } from '@/types'
+
+interface DebugEntry {
+  timestamp: number
+  type: string
+  content: string
+  meta?: Record<string, unknown>
+}
+
+// 打字机动画速度 (ms/字符)，带随机抖动模拟真实流式感
+const TYPEWRITER_BASE_SPEED = 25
+const TYPEWRITER_JITTER = 15
 
 export function useChatStream() {
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [firstTokenReceived, setFirstTokenReceived] = useState(false)
-  const abortControllerRef = useRef<AbortController | null>(null)
   const firstTokenRef = useRef(false)
   const onFirstTokenRef = useRef<(() => void) | null>(null)
   const { append: terminalLog } = useTerminalLogs()
-  const tokenBatchRef = useRef('')
+  const typewriterAbortRef = useRef<AbortController | null>(null)
 
   const clearStream = useCallback(() => {
+    typewriterAbortRef.current?.abort()
+    typewriterAbortRef.current = null
     setStreamingContent('')
     setIsStreaming(false)
     setFirstTokenReceived(false)
@@ -23,13 +35,11 @@ export function useChatStream() {
     onFirstTokenRef.current = null
   }, [])
 
-  // 流结束后只标记停止，不清空内容 —— 等 DB refetch 后再调用 clearStream
   const finalizeStream = useCallback(() => {
     setIsStreaming(false)
   }, [])
 
   const abort = useCallback(() => {
-    abortControllerRef.current?.abort()
     clearStream()
   }, [clearStream])
 
@@ -57,10 +67,12 @@ export function useChatStream() {
       setFirstTokenReceived(false)
       firstTokenRef.current = false
 
-      const controller = new AbortController()
-      abortControllerRef.current = controller
+      // 取消上一次的打字机动画
+      typewriterAbortRef.current?.abort()
+      const abortController = new AbortController()
+      typewriterAbortRef.current = abortController
 
-      // 🔌 网络日志: 请求发起
+      // 🔌 网络日志
       terminalLog({
         type: 'network',
         content: `CONNECT → ${apiUrl}`,
@@ -81,7 +93,7 @@ export function useChatStream() {
           apiKey,
           model,
         }),
-        signal: controller.signal,
+        signal: abortController.signal,
       })
 
       const networkTime = (performance.now() - startTime).toFixed(0)
@@ -103,110 +115,70 @@ export function useChatStream() {
         throw new Error(errorBody || `HTTP ${response.status}`)
       }
 
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response body')
+      // 解析非流式 JSON 响应
+      const data = await response.json()
+      const fullContent = data.content as string
+      const serverDebug = data.__debug as DebugEntry[] | undefined
 
-      const decoder = new TextDecoder()
-      let fullContent = ''
-      let totalBytes = 0
-      let chunkCount = 0
-      let lastChunkTime = performance.now()
-      const streamStartTime = performance.now()
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        totalBytes += value?.length ?? 0
-        chunkCount++
-        const now = performance.now()
-        const chunkInterval = (now - lastChunkTime).toFixed(0)
-        lastChunkTime = now
-
-        // 📥 每隔一批 chunk 汇报网络流量
-        if (chunkCount % 5 === 0) {
+      // 输出服务端 debug 日志
+      if (serverDebug) {
+        for (const entry of serverDebug) {
           terminalLog({
-            type: 'network',
-            content: `CHUNK #${chunkCount} (${totalBytes} bytes, +${chunkInterval}ms)`,
+            type: entry.type as TerminalLogType,
+            content: entry.content,
             conversationId,
-            meta: { bytes: totalBytes, chunks: chunkCount, interval: `${chunkInterval}ms` },
+            meta: entry.meta,
           })
         }
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim()
-            if (data === '[DONE]') continue
-            try {
-              const token = JSON.parse(data) as string
-              if (token && typeof token === 'string') {
-                fullContent += token
-                setStreamingContent((prev) => prev + token)
-                if (!firstTokenRef.current) {
-                  firstTokenRef.current = true
-                  setFirstTokenReceived(true)
-                  onFirstTokenRef.current?.()
-                }
-                tokenBatchRef.current += token
-                if (tokenBatchRef.current.length >= 8) {
-                  terminalLog({ type: 'token', content: tokenBatchRef.current, conversationId })
-                  tokenBatchRef.current = ''
-                }
-              }
-            } catch {
-              if (data) {
-                fullContent += data
-                setStreamingContent((prev) => prev + data)
-              }
-            }
-          }
-        }
       }
 
-      // 输出剩余的 token 批量
-      if (tokenBatchRef.current) {
-        terminalLog({ type: 'token', content: tokenBatchRef.current, conversationId })
-        tokenBatchRef.current = ''
-      }
-
-      const streamDuration = ((performance.now() - streamStartTime) / 1000).toFixed(1)
       const totalTime = ((performance.now() - startTime) / 1000).toFixed(1)
-      const tokCount = fullContent.length
-      const tokPerSec = parseFloat(streamDuration) > 0
-        ? (tokCount / parseFloat(streamDuration)).toFixed(1)
-        : '0'
-
-      // ⏱ 性能总结
       terminalLog({
         type: 'perf',
-        content: `STREAM COMPLETE — ${tokCount} chars in ${streamDuration}s (${tokPerSec} char/s), ${totalBytes} bytes, ${chunkCount} chunks`,
+        content: `AI RESPONSE — ${fullContent.length} chars in ${totalTime}s (network: ${networkTime}ms)`,
         conversationId,
         meta: {
-          totalChars: tokCount,
-          totalBytes,
-          chunkCount,
-          streamDuration: `${streamDuration}s`,
+          totalChars: fullContent.length,
           totalTime: `${totalTime}s`,
-          charsPerSec: tokPerSec,
           networkTime: `${networkTime}ms`,
         },
       })
 
-      // 💾 DB 写入日志 (服务端已写入，此处做标记)
-      terminalLog({
-        type: 'db',
-        content: `DB WRITE: AI response saved (${tokCount} chars)`,
-        conversationId,
-        meta: { charCount: tokCount, bytes: totalBytes },
-      })
+      // ====== 打字机动画：逐字输出模拟流式效果 ======
+      if (fullContent && !abortController.signal.aborted) {
+        let index = 0
+        setStreamingContent('')
+        firstTokenRef.current = false
 
+        await new Promise<void>((resolve) => {
+          const tick = () => {
+            if (abortController.signal.aborted) {
+              resolve()
+              return
+            }
+            index++
+            if (index > fullContent.length) {
+              resolve()
+              return
+            }
+            const partial = fullContent.slice(0, index)
+            setStreamingContent(partial)
+            if (!firstTokenRef.current && partial.length > 0) {
+              firstTokenRef.current = true
+              setFirstTokenReceived(true)
+              onFirstTokenRef.current?.()
+            }
+            // 随机延迟模拟真实流式感
+            const delay = TYPEWRITER_BASE_SPEED + Math.random() * TYPEWRITER_JITTER
+            setTimeout(tick, delay)
+          }
+          // 首字符立即输出
+          tick()
+        })
+      }
+
+      // 打字机完成，不清除 isStreaming——由调用方 clearStream 统一清理
       return fullContent
-    },
-    onSuccess: (_fullContent) => {
-      // 不在 onSuccess 中清除 streamingContent/设置 isStreaming
-      // 由调用方在 DB refetch 后调用 clearStream 完成最终清理
     },
     onError: (error) => {
       setIsStreaming(false)
