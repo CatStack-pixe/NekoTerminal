@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { Suspense, useEffect, useState, use } from 'react'
 import { VSCodeShell } from '@/components/ui/DotMatrixBg'
 
 interface DebugSnapshot {
@@ -19,7 +19,6 @@ interface DebugEntry {
   meta?: Record<string, unknown>
 }
 
-// 与 DebugTerminal 保持一致的类型映射
 const TYPE_LABELS: Record<string, string> = {
   system: 'INFO',
   user: 'INFO',
@@ -74,7 +73,20 @@ function DebugLogLine({ entry }: { entry: DebugEntry }) {
   )
 }
 
-export default function DebugPage({ params }: { params: Promise<{ token: string }> }) {
+function LoadingShell() {
+  return (
+    <VSCodeShell>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="font-mono text-terminal-dim text-sm flex items-center gap-2">
+          <span className="inline-block w-2 h-4 bg-terminal-primary animate-blink" />
+          {'>>> '}LOADING DEBUG SNAPSHOT...
+        </div>
+      </div>
+    </VSCodeShell>
+  )
+}
+
+function DebugPageContent({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
   const [snapshot, setSnapshot] = useState<DebugSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,7 +125,6 @@ export default function DebugPage({ params }: { params: Promise<{ token: string 
     }
   }, [token])
 
-  // 过期倒计时
   useEffect(() => {
     if (!snapshot?.expiresAt) return
 
@@ -140,16 +151,7 @@ export default function DebugPage({ params }: { params: Promise<{ token: string 
   }, [snapshot?.expiresAt])
 
   if (loading) {
-    return (
-      <VSCodeShell>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="font-mono text-terminal-dim text-sm flex items-center gap-2">
-            <span className="inline-block w-2 h-4 bg-terminal-primary animate-blink" />
-            {'>>> '}LOADING DEBUG SNAPSHOT...
-          </div>
-        </div>
-      </VSCodeShell>
-    )
+    return <LoadingShell />
   }
 
   if (error) {
@@ -189,7 +191,6 @@ export default function DebugPage({ params }: { params: Promise<{ token: string 
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto font-mono text-sm leading-relaxed p-4">
-          {/* Full AI Output */}
           <div className="mb-6">
             <div className="text-[10px] text-terminal-dim font-bold uppercase tracking-wider mb-2 border-b border-terminal-border pb-1">
               {'>>>'} FULL OUTPUT
@@ -197,7 +198,6 @@ export default function DebugPage({ params }: { params: Promise<{ token: string 
             <pre className="text-terminal-text whitespace-pre-wrap break-words text-xs">{snapshot.fullOutput || '(empty)'}</pre>
           </div>
 
-          {/* Debug Logs */}
           <div>
             <div className="text-[10px] text-terminal-dim font-bold uppercase tracking-wider mb-2 border-b border-terminal-border pb-1">
               {'>>>'} DEBUG LOGS ({snapshot.debugLogs?.length ?? 0} entries)
@@ -224,5 +224,13 @@ export default function DebugPage({ params }: { params: Promise<{ token: string 
         </div>
       </div>
     </VSCodeShell>
+  )
+}
+
+export default function DebugPage({ params }: { params: Promise<{ token: string }> }) {
+  return (
+    <Suspense fallback={<LoadingShell />}>
+      <DebugPageContent params={params} />
+    </Suspense>
   )
 }
